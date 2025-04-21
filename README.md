@@ -96,5 +96,5 @@ projet-livre-dor-audio/
 
 ## Licence
 
-Ce projet est sous licence MIT. Consultez le fichier `LICENSE` pour plus de détails.
+Ce projet est sous licence GNU GPLv3. Consultez le fichier `LICENSE` pour plus de détails.
 
