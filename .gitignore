@@ -1,3 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+*.egg-info/
+
+# Logs & records
+logs/
+audio/enregistrements/
+
+# Config sensitive
+config/*.secret.json
+
+# Editor
+*.swp
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
