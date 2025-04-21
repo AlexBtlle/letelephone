@@ -1,4 +1,4 @@
-# Livre d’Or Audio - Le Téléphone
+# Livre d’Or Audio
 
 Un **système interactif de livre d’or audio** basé sur Raspberry Pi permettant de recueillir des messages vocaux lors d’un événement (par exemple, un mariage). Les invités décrochent un combiné de téléphone ancien, entendent une annonce d’accueil, puis enregistrent leur message qui est stocké sur une clé USB.
 
@@ -13,7 +13,6 @@ Un **système interactif de livre d’or audio** basé sur Raspberry Pi permet
 - **Stockage sur clé USB** : Montage automatique, vérification d’intégrité et gestion de l’espace libre.
 - **Configuration dynamique** : Paramètres (GPIO, durées, chemins) modifiables via un fichier JSON/YAML sur la clé USB.
 - **Journalisation** : Logs d’événements (décrochage, début/arrêt, erreurs) enregistrés sur la clé.
-- **Interface visuelle** : Écran OLED I2C 128×64 affiche l’état, la durée, l’espace et les erreurs en temps réel.
 - **Démarrage autonome** : Lancement du service Python au boot via systemd.
 
 > **Évolution future** : Interface Web pour consulter et écouter les messages à distance.
@@ -29,72 +28,59 @@ projet-livre-dor-audio/
 ├── requirements.txt
 ├── src/
 │   ├── main.py          # Script principal
-│   ├── detection.py     # Gestion GPIO
-│   ├── audio.py         # Lecture et enregistrement
-│   ├── display.py       # Pilotage de l’écran OLED
+│   ├── detection.py     # Gestion GPIO (hook switch)
+│   ├── audio.py         # Lecture et enregistrement audio
+│   ├── display.py       # Pilotage de l’écran OLED (optionnel)
 │   └── utils.py         # Fonctions utilitaires
 ├── config/
-│   └── config.json      # Paramètres modifiables
+│   └── config.json      # Paramètres modifiables (JSON/YAML)
 ├── audio/
-│   ├── annonces/        # MP3 d’accueil et messages d’erreur
-│   └── enregistrements/ # Fichiers WAV/MP3 enregistrés
+│   ├── annonces/        # Fichiers MP3 d’accueil, bip et erreurs
+│   └── enregistrements/ # WAV/MP3 générés
 └── logs/                # Fichiers de journalisation
 ```
 
 ---
 
-## Installation & Mise en route
+## Branchements
 
-1. **Cloner le dépôt** (via l’interface web ou `git clone`):
-   ```bash
-   git clone https://github.com/<votre‑utilisateur>/livre-dor-audio.git
-   cd livre-dor-audio
-   ```
-2. **Créer un environnement virtuel Python** :
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-3. **Installer les dépendances** :
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-4. **Configurer le Raspberry Pi** :
-   - Activer I2C (`raspi-config`).
-   - Forcer la sortie audio jack : `amixer cset numid=3 1`.
-5. **Préparer la clé USB** :
-   - Créer un fichier `config/config.json` avec les paramètres.
-   - Copier les annonces MP3 dans `audio/annonces/`.
-6. **Installer le service systemd** :
-   ```bash
-   sudo cp deploy/livre_dor.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable livre_dor.service
-   sudo systemctl start livre_dor.service
-   ```
+### 1. Hook switch (combiné Socotel)
+- **GPIO BCM 17** (pin 11) connecté à une borne de l’interrupteur hook.
+- L’autre borne de l’interrupteur reliée au **3.3 V** (pin 1).
+- Activation du pull‑down interne sur GPIO 17 pour garantir LOW quand raccroché.
+
+### 2. Circuit audio (dongle USB)
+- **Sortie casque** (Headphone Out) prise jack → fil **speaker** du combiné.
+- **Entrée micro** (Mic In) du dongle USB → fil **microphone** du combiné.
+- **Masse** du dongle USB → fil **masse** du combiné (commune aux deux signaux).
+
+### 3. Clé USB
+- Branchée sur un port USB du Raspberry Pi.
+- Point de montage configurable (ex : `/mnt/usb`).
+
+### 4. Alimentation
+- **Raspberry Pi 4** alimenté en 5 V (via adaptateur USB‑C ou batterie externe).
 
 ---
 
 ## Utilisation
 
-- **Monitoring** : L’écran OLED affiche l’état en temps réel.
-- **Emplacement des fichiers** :
-  - Enregistrements ➔ `audio/enregistrements/`
-  - Logs ➔ `logs/`
-- **Paramètres** : modifier `config/config.json` sur la clé USB et redémarrer le service.
+- **Monitoring console** : supervision directe via les logs `stdout`.
+- **Fichiers générés** :
+  - Enregistrements → `audio/enregistrements/`
+  - Logs système → `logs/system.log`
+- **Paramètres** : modifier `config/config.json` sur la clé et redémarrer le service.
 
 ---
 
 ## Contribuer
 
 - **Branches** : `main` (stable), `dev` (intégration), `feature/<nom>`.
-- **Commits sémantiques** (feat, fix, chore, docs, refactor).
-- **Tests** : ajouter des tests unitaires et valider via CI (GitHub Actions).
+- **Commits sémantiques** : `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`.
+- **Tests** : ajout de tests unitaires pour chaque module avec pytest.
 
 ---
 
 ## Licence
 
-Ce projet est sous licence GNU GPLv3. Consultez le fichier `LICENSE` pour plus de détails.
-
+Licence **GNU GPL v3**. Voir le fichier `LICENSE` pour plus de détails.
