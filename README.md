@@ -84,3 +84,5 @@ projet-livre-dor-audio/
 ## Licence
 
 Licence **GNU GPL v3**. Voir le fichier `LICENSE` pour plus de détails.
+
+> **Note**: La majeure partie du contenu de ce projet (code, documentation, README) a été générée par ChatGPT.
