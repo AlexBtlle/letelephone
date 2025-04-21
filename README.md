@@ -9,13 +9,13 @@ Un **système interactif de livre d’or audio** basé sur Raspberry Pi permet
 - **Détection du combiné** : Hook switch (GPIO) détecte le décrochage et le raccrochage.
 - **Annonce sonore** : Lecture automatique d’un fichier MP3 d’accueil dès le décrochage.
 - **Enregistrement audio** : Démarrage automatique de l’enregistrement après l’annonce, fin lors du raccrochage.
-- **Durée maximale** : Timer configurable pour limiter la durée d’enregistrement.
-- **Stockage sur clé USB** : Montage automatique, vérification d’intégrité et gestion de l’espace libre.
-- **Configuration dynamique** : Paramètres (GPIO, durées, chemins) modifiables via un fichier JSON/YAML sur la clé USB.
+- **TODO Durée maximale** : Timer configurable pour limiter la durée d’enregistrement.
+- **TODO Stockage sur clé USB** : Montage automatique, vérification d’intégrité et gestion de l’espace libre.
+- **TODO Configuration dynamique** : Paramètres (GPIO, durées, chemins) modifiables via un fichier JSON/YAML sur la clé USB.
 - **Journalisation** : Logs d’événements (décrochage, début/arrêt, erreurs) enregistrés sur la clé.
-- **Démarrage autonome** : Lancement du service Python au boot via systemd.
+- **TODO Démarrage autonome** : Lancement du service Python au boot via systemd.
 
-> **Évolution future** : Interface Web pour consulter et écouter les messages à distance.
+> **Évolutions envisagées** : Interface Web pour consulter et écouter les messages à distance.
 
 ---
 
@@ -85,4 +85,4 @@ projet-livre-dor-audio/
 
 Licence **GNU GPL v3**. Voir le fichier `LICENSE` pour plus de détails.
 
-> **Note**: La majeure partie du contenu de ce projet (code, documentation, README) a été générée par ChatGPT.
+> **Note**: Certaines parties du contenu de ce projet (code, documentation, README) ont été générées par ChatGPT.
