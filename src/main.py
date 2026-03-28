@@ -34,6 +34,7 @@ def main() -> None:
                 print("Décroché détecté.")
 
                 try:
+                    time.sleep(2)
                     audio.play_beep(BEEP_FILE)
                 except Exception as exc:
                     print(f"Erreur lecture bip : {exc}")
