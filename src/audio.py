@@ -8,7 +8,7 @@ class AudioController:
         playback_device: str = "hw:2,0",
         capture_device: str = "hw:3,0",
         sample_rate: int = 48000,
-        channels: int = 1,
+        channels: int = 2,
         max_duration_sec: int = 180,
     ):
         self.playback_device = playback_device

@@ -22,7 +22,7 @@ def main() -> None:
         playback_device="hw:2,0",
         capture_device="hw:3,0",
         sample_rate=48000,
-        channels=1,
+        channels=2,
         max_duration_sec=180,
     )
 

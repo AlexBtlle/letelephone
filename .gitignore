@@ -199,3 +199,4 @@ archive/test_utils.py
 archive/utils.py
 archive/config/exemple_livre_or.service
 archive/config/exmple_config.json
+recordings/
