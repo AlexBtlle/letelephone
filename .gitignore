@@ -190,3 +190,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 src/audio/enregistrements/
+archive/audio.py
+archive/detection.py
+archive/main.py
+archive/test_audio.py
+archive/test_detection.py
+archive/test_utils.py
+archive/utils.py
+archive/config/exemple_livre_or.service
+archive/config/exmple_config.json
