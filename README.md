@@ -1,5 +1,7 @@
 # Livre d’Or Audio
 
+**En cours de développement - Je ne garantie pas le bon fonctionnement**
+
 Un **système interactif de livre d’or audio** basé sur Raspberry Pi permettant de recueillir des messages vocaux lors d’un événement (par exemple, un mariage). Les invités décrochent un combiné de téléphone ancien, entendent une annonce d’accueil, puis enregistrent leur message qui est stocké sur une clé USB.
 
 ---
