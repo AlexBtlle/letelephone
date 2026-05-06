@@ -1,74 +1,137 @@
+import logging
+import sys
 import time
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from audio import AudioController
-from hook import HookSwitch
-from storage import build_recording_path, ensure_recordings_dir
+from src.audio import AudioController
+from src.config import load as load_config
+from src.hook import HookSwitch
+from src.storage import build_recording_path, ensure_recordings_dir
+from src.usb import UsbStorage
+
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_ASSETS_DIR = _BASE_DIR / "assets"
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-ASSETS_DIR = BASE_DIR / "assets"
-BEEP_FILE = ASSETS_DIR / "beep.wav"
+def _setup_logging(log_dir: Path) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "letelephone.log"
+    formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
 
-HOOK_GPIO = 17
-POLL_INTERVAL = 0.05
+    file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=3)
+    file_handler.setFormatter(formatter)
 
-RECORDINGS_DIR = ensure_recordings_dir(BASE_DIR)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+
+    logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
 
 
 def main() -> None:
-    hook = HookSwitch(gpio_pin=HOOK_GPIO, pull_up=True, bounce_time=0.05)
+    cfg = load_config()
+
+    usb = UsbStorage()
+    recordings_dir = usb.recordings_dir() if usb.is_available() else ensure_recordings_dir(_BASE_DIR)
+    log_dir = usb.log_dir() if usb.is_available() else _BASE_DIR / "logs"
+
+    _setup_logging(log_dir)
+    log = logging.getLogger(__name__)
+
+    log.info("Démarrage. Enregistrements → %s", recordings_dir)
+    if not usb.is_available():
+        log.warning("Clé USB non détectée — enregistrements en local.")
+
+    event = cfg.get("event", {})
+    welcome_name = event.get("welcome_audio", "")
+    welcome_file = _ASSETS_DIR / welcome_name if welcome_name else _ASSETS_DIR / "beep.wav"
+    if not welcome_file.exists():
+        log.warning("Fichier d'accueil '%s' introuvable, fallback sur beep.wav", welcome_file.name)
+        welcome_file = _ASSETS_DIR / "beep.wav"
+
+    error_file = _ASSETS_DIR / "error.wav"
+    beep_file = _ASSETS_DIR / "beep.wav"
+
     audio = AudioController(
-        playback_device="hw:2,0",
-        capture_device="hw:3,0",
-        sample_rate=48000,
-        channels=2,
-        max_duration_sec=180,
+        sample_rate=cfg["audio"]["sample_rate"],
+        channels=cfg["audio"]["channels"],
+        max_duration_sec=cfg["max_duration_sec"],
     )
 
-    print("Système prêt. En attente du décrochage...")
+    hook = HookSwitch(
+        gpio_pin=cfg["hook_pin"],
+        pull_up=True,
+        bounce_time=0.05,
+    )
+
+    poll = cfg["poll_interval_sec"]
+    pre_beep_delay = cfg["pre_beep_delay_sec"]
+
+    if event.get("couple_name"):
+        log.info("Événement : %s — %s", event["couple_name"], event.get("date", ""))
+
+    log.info("Système prêt. En attente du décrochage...")
 
     try:
         while True:
             if hook.is_off_hook():
-                print("Décroché détecté.")
+                log.info("Décroché détecté.")
 
+                time.sleep(pre_beep_delay)
+
+                # Play welcome message (custom or beep)
                 try:
-                    time.sleep(2)
-                    audio.play_beep(BEEP_FILE)
+                    audio.play_audio(welcome_file)
                 except Exception as exc:
-                    print(f"Erreur lecture bip : {exc}")
-                    time.sleep(1)
+                    log.error("Erreur lecture message d'accueil : %s", exc)
+                    _try_play_error(audio, error_file)
+                    _wait_for_hangup(hook, poll)
                     continue
 
-                output_file = build_recording_path(RECORDINGS_DIR)
-
+                # Start recording
+                output_file = build_recording_path(recordings_dir)
                 try:
                     audio.start_recording(output_file)
-                    print(f"Enregistrement démarré : {output_file.name}")
                 except Exception as exc:
-                    print(f"Erreur démarrage enregistrement : {exc}")
-                    time.sleep(1)
+                    log.error("Erreur démarrage enregistrement : %s", exc)
+                    _try_play_error(audio, error_file)
+                    _wait_for_hangup(hook, poll)
                     continue
 
+                # Wait until hangup or max duration
                 while hook.is_off_hook() and audio.is_recording():
-                    time.sleep(POLL_INTERVAL)
+                    time.sleep(poll)
 
                 audio.stop_recording()
-                print("Enregistrement arrêté.")
 
-                while hook.is_off_hook():
-                    time.sleep(POLL_INTERVAL)
+                if output_file.exists() and output_file.stat().st_size > 0:
+                    log.info("Message enregistré : %s (%.1f ko)", output_file.name, output_file.stat().st_size / 1024)
+                else:
+                    log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 
-                print("Retour en attente.")
+                _wait_for_hangup(hook, poll)
+                log.info("Retour en attente.")
 
-            time.sleep(POLL_INTERVAL)
+            time.sleep(poll)
 
     except KeyboardInterrupt:
-        print("\nArrêt demandé.")
+        log.info("Arrêt demandé.")
     finally:
         audio.stop_recording()
         hook.close()
+
+
+def _wait_for_hangup(hook: HookSwitch, poll: float) -> None:
+    while hook.is_off_hook():
+        time.sleep(poll)
+
+
+def _try_play_error(audio: AudioController, error_file: Path) -> None:
+    if error_file.exists():
+        try:
+            audio.play_audio(error_file)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
