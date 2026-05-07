@@ -38,6 +38,19 @@ class UsbStorage:
         candidate = self._mount_point / "welcome.wav"  # type: ignore[operator]
         return candidate if candidate.exists() else None
 
+    def couple_name(self) -> str:
+        """Return content of couple.txt at USB root, stripped, or empty string."""
+        if not self.is_available():
+            return ""
+        candidate = self._mount_point / "couple.txt"  # type: ignore[operator]
+        if not candidate.exists():
+            return ""
+        try:
+            return candidate.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            log.warning("Impossible de lire couple.txt : %s", exc)
+            return ""
+
     def eject(self) -> None:
         if not self.is_available():
             return

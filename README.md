@@ -8,6 +8,8 @@ Un **système de livre d'or audio** sur Raspberry Pi pour les mariages et évén
 
 - **Détection du combiné** : hook switch GPIO, décrochage/raccrochage détectés automatiquement
 - **Message d'accueil personnalisé** : `welcome.wav` à la racine de la clé USB, bip par défaut si absent
+- **Afficheur OLED** : nom du couple, statut (en attente / enregistrement), compteur de messages (SSD1306 I2C)
+- **Filtre durée** : enregistrements de moins de 1 seconde ignorés automatiquement
 - **Enregistrement automatique** : démarre après l'annonce, s'arrête au raccrochage
 - **Durée maximale** : configurable (défaut 3 minutes)
 - **Sauvegarde sur clé USB** : dossier `enregistrements/`, fallback local si clé absente
@@ -93,11 +95,19 @@ journalctl -u letelephone -f
 
 ### Préparer un événement
 
-1. Enregistrer le message d'accueil du couple (ex. sur téléphone, puis transférer sur PC)
-2. Convertir en WAV mono 44100 Hz si besoin (via Audacity ou `ffmpeg -i welcome.m4a -ar 44100 -ac 1 welcome.wav`)
-3. Copier `welcome.wav` à la **racine** de la clé USB
+Copier ces fichiers à la **racine** de la clé USB avant de la brancher au Pi :
 
-Le téléphone détecte automatiquement le fichier au démarrage. Pour changer de message, remplacer simplement le fichier sur la clé.
+| Fichier | Rôle | Obligatoire |
+|---|---|---|
+| `welcome.wav` | Message d'accueil du couple (WAV mono 44100 Hz) | Non — bip par défaut |
+| `couple.txt` | Nom du couple, ex. `Alice & Bob` | Non — écran vide sinon |
+
+Convertir un enregistrement vocal si besoin :
+```bash
+ffmpeg -i welcome.m4a -ar 44100 -ac 1 welcome.wav
+```
+
+Le téléphone détecte tout automatiquement au boot. Pour un nouvel événement, remplacer simplement les fichiers sur la clé.
 
 ### Pendant l'événement
 

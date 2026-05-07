@@ -232,10 +232,10 @@ def test_main_recording_start_error_plays_error_sound(env, caplog):
     env["audio"].stop_recording.assert_called()
 
 
-def test_main_logs_warning_on_empty_recording(env, caplog, tmp_path):
-    """If the recorded file is empty, log a warning."""
+def test_main_logs_warning_on_empty_recording(env, caplog):
+    """If the recorded file is empty (but long enough), log a warning."""
     wav = env["recordings"] / "message_empty.wav"
-    wav.write_bytes(b"")  # exists but empty
+    wav.write_bytes(b"")  # exists but empty (0 bytes)
 
     env["audio"].is_recording.side_effect = [False]
     env["hook"].is_off_hook.side_effect = [
@@ -246,6 +246,7 @@ def test_main_logs_warning_on_empty_recording(env, caplog, tmp_path):
 
     with caplog.at_level(logging.WARNING, logger="src.main"), \
          patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
          patch("src.main.time.sleep", return_value=None), \
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
@@ -254,3 +255,81 @@ def test_main_logs_warning_on_empty_recording(env, caplog, tmp_path):
         main_module.main()
 
     assert any("vide" in r.message for r in caplog.records)
+
+
+def test_main_short_recording_discarded(env, caplog):
+    """Recording shorter than min_duration_sec must be deleted and not counted."""
+    wav = env["recordings"] / "message_short.wav"
+    wav.write_bytes(b"\x00" * 100)
+
+    env["audio"].is_recording.return_value = False
+    env["hook"].is_off_hook.side_effect = [
+        True,   # off-hook
+        False,  # wait_for_hangup
+        KeyboardInterrupt,
+    ]
+
+    with caplog.at_level(logging.INFO, logger="src.main"), \
+         patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 0.3]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+        main_module.main()
+
+    assert not wav.exists(), "Le fichier court doit être supprimé"
+    assert any("court" in r.message for r in caplog.records)
+
+
+def test_main_display_updated_on_recording(env):
+    """Display must switch to show_recording on pickup and back to show_idle after."""
+    mock_display = MagicMock()
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [
+        True,
+        False,  # wait_for_hangup
+        KeyboardInterrupt,
+    ]
+
+    with patch("src.main.build_display", return_value=mock_display), \
+         patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+        main_module.main()
+
+    mock_display.show_recording.assert_called()
+    mock_display.show_idle.assert_called()
+
+
+def test_main_message_counter_increments(env):
+    """message_count must increment after a successful recording."""
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+    mock_display = MagicMock()
+
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_display", return_value=mock_display), \
+         patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.count_recordings", return_value=3), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+        main_module.main()
+
+    # Final show_idle call must carry count=4 (3 existing + 1 new)
+    final_idle_call = mock_display.show_idle.call_args_list[-1]
+    assert final_idle_call.args[1] == 4

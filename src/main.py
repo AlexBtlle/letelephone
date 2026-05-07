@@ -6,8 +6,9 @@ from pathlib import Path
 
 from src.audio import AudioController
 from src.config import ConfigError, load as load_config
+from src.display import build as build_display
 from src.hook import HookSwitch
-from src.storage import build_recording_path, ensure_recordings_dir
+from src.storage import build_recording_path, count_recordings, ensure_recordings_dir
 from src.usb import UsbStorage
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,6 +21,8 @@ _DEFAULTS = {
     "poll_interval_sec": 0.05,
     "pre_beep_delay_sec": 2.0,
     "max_duration_sec": 180,
+    "min_duration_sec": 1.0,
+    "couple_name": "",
     "audio": {"sample_rate": 44100, "channels": 1},
 }
 
@@ -39,7 +42,6 @@ def _setup_logging(log_dir: Path) -> None:
 def main() -> None:
     usb = UsbStorage()
 
-    # Logging bootstrap (before config, so we can log config errors)
     log_dir = _BASE_DIR / "logs"
     try:
         log_dir = usb.log_dir() if usb.is_available() else _BASE_DIR / "logs"
@@ -48,7 +50,6 @@ def main() -> None:
     _setup_logging(log_dir)
     log = logging.getLogger(__name__)
 
-    # Config — fall back to built-in defaults on any error
     try:
         cfg = load_config()
     except ConfigError as exc:
@@ -56,7 +57,6 @@ def main() -> None:
         cfg = _DEFAULTS.copy()
         cfg["audio"] = _DEFAULTS["audio"].copy()
 
-    # Recordings directory — fall back to local if USB fails
     try:
         recordings_dir = usb.recordings_dir() if usb.is_available() else ensure_recordings_dir(_BASE_DIR)
     except OSError as exc:
@@ -70,17 +70,25 @@ def main() -> None:
     welcome_file = usb.welcome_file() or _BEEP_FILE
     log.info("Message d'accueil : %s", welcome_file.name)
 
+    couple_name = usb.couple_name() or cfg.get("couple_name", "")
+    if couple_name:
+        log.info("Événement : %s", couple_name)
+
     audio = AudioController(
         sample_rate=cfg["audio"]["sample_rate"],
         channels=cfg["audio"]["channels"],
         max_duration_sec=cfg["max_duration_sec"],
     )
     hook = HookSwitch(gpio_pin=cfg["hook_pin"], pull_up=True, bounce_time=0.05)
+    display = build_display()
 
     poll = cfg["poll_interval_sec"]
     pre_beep_delay = cfg["pre_beep_delay_sec"]
+    min_duration = cfg.get("min_duration_sec", 1.0)
 
-    log.info("Système prêt. En attente du décrochage...")
+    message_count = count_recordings(recordings_dir)
+    log.info("Système prêt (%d message(s) existant(s)).", message_count)
+    display.show_idle(couple_name, message_count)
 
     try:
         while True:
@@ -93,6 +101,7 @@ def main() -> None:
 
             if off_hook:
                 log.info("Décroché détecté.")
+                display.show_recording(couple_name, message_count)
                 time.sleep(pre_beep_delay)
 
                 try:
@@ -100,15 +109,18 @@ def main() -> None:
                 except Exception as exc:
                     log.error("Erreur lecture message d'accueil : %s", exc)
                     _try_play_error(audio)
+                    display.show_idle(couple_name, message_count)
                     _wait_for_hangup(hook, poll)
                     continue
 
                 output_file = build_recording_path(recordings_dir)
+                record_start = time.monotonic()
                 try:
                     audio.start_recording(output_file)
                 except Exception as exc:
                     log.error("Erreur démarrage enregistrement : %s", exc)
                     _try_play_error(audio)
+                    display.show_idle(couple_name, message_count)
                     _wait_for_hangup(hook, poll)
                     continue
 
@@ -116,16 +128,27 @@ def main() -> None:
                     time.sleep(poll)
 
                 audio.stop_recording()
+                duration = time.monotonic() - record_start
+
+                if duration < min_duration:
+                    output_file.unlink(missing_ok=True)
+                    log.info("Message ignoré (trop court : %.1fs)", duration)
+                    display.show_idle(couple_name, message_count)
+                    _wait_for_hangup(hook, poll)
+                    continue
 
                 if output_file.exists() and output_file.stat().st_size > 0:
+                    message_count += 1
                     log.info(
-                        "Message enregistré : %s (%.1f ko)",
+                        "Message #%d enregistré : %s (%.1f ko)",
+                        message_count,
                         output_file.name,
                         output_file.stat().st_size / 1024,
                     )
                 else:
                     log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 
+                display.show_idle(couple_name, message_count)
                 _wait_for_hangup(hook, poll)
                 log.info("Retour en attente.")
 
@@ -136,6 +159,7 @@ def main() -> None:
     finally:
         audio.stop_recording()
         hook.close()
+        display.clear()
 
 
 def _wait_for_hangup(hook: HookSwitch, poll: float) -> None:

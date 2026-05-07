@@ -102,3 +102,43 @@ def test_eject_noop_when_no_usb(monkeypatch):
     monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
     usb = UsbStorage()
     usb.eject()  # must not raise
+
+
+# ── couple_name() ─────────────────────────────────────────────────────────────
+
+def test_couple_name_read_from_file(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_text("Alice & Bob\n", encoding="utf-8")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Alice & Bob"
+
+
+def test_couple_name_stripped(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_text("  Marie & Paul  \n", encoding="utf-8")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Marie & Paul"
+
+
+def test_couple_name_absent_returns_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == ""
+
+
+def test_couple_name_no_usb_returns_empty(monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
+    usb = UsbStorage()
+    assert usb.couple_name() == ""
+
+
+def test_couple_name_os_error_returns_empty(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_bytes(b"\x00")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True), \
+         patch.object(Path, "read_text", side_effect=OSError("permission denied")):
+        usb = UsbStorage()
+        assert usb.couple_name() == ""

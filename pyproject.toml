@@ -9,6 +9,7 @@ description = "Livre d'or audio sur Raspberry Pi"
 requires-python = ">=3.11"
 dependencies = [
     "gpiozero",
+    "luma.oled",
 ]
 
 [project.scripts]
