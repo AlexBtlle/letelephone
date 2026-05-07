@@ -8,5 +8,11 @@
   "audio": {
     "sample_rate": 44100,
     "channels": 1
+  },
+  "normalize_audio": true,
+  "shutdown_button": {
+    "enabled": false,
+    "pin": 27,
+    "hold_duration_sec": 3.0
   }
 }

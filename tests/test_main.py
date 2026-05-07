@@ -73,6 +73,8 @@ def _run_main(env):
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"), \
          patch("src.main.time.sleep", return_value=None):
         main_module.main()
 
@@ -144,7 +146,9 @@ def test_main_falls_back_to_local_recordings_on_usb_error(env):
          patch("src.main.time.sleep", return_value=None), \
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
-         patch("src.main.HookSwitch", return_value=env["hook"]):
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     mock_ensure.assert_called()
@@ -171,7 +175,9 @@ def test_main_happy_path_records_message(env, tmp_path):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     env["audio"].play_audio.assert_called_once()
@@ -225,7 +231,9 @@ def test_main_recording_start_error_plays_error_sound(env, caplog):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     assert any("enregistrement" in r.message.lower() for r in caplog.records)
@@ -251,7 +259,9 @@ def test_main_logs_warning_on_empty_recording(env, caplog):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     assert any("vide" in r.message for r in caplog.records)
@@ -276,7 +286,9 @@ def test_main_short_recording_discarded(env, caplog):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     assert not wav.exists(), "Le fichier court doit être supprimé"
@@ -303,7 +315,9 @@ def test_main_display_updated_on_recording(env):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     mock_display.show_recording.assert_called()
@@ -327,9 +341,63 @@ def test_main_message_counter_increments(env):
          patch("src.main.UsbStorage", return_value=env["usb"]), \
          patch("src.main.AudioController", return_value=env["audio"]), \
          patch("src.main.HookSwitch", return_value=env["hook"]), \
-         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]):
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"):
         main_module.main()
 
     # Final show_idle call must carry count=4 (3 existing + 1 new)
     final_idle_call = mock_display.show_idle.call_args_list[-1]
     assert final_idle_call.args[1] == 4
+
+
+def test_main_normalize_called_after_recording(env):
+    """normalize_audio must be called once after a valid recording."""
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio") as mock_normalize:
+        main_module.main()
+
+    mock_normalize.assert_called_once_with(wav)
+
+
+def test_main_normalize_skipped_when_disabled(env):
+    """normalize_audio must not be called when normalize_audio=false in config."""
+    import src.config as cfg_mod
+    cfg_dir = env["tmp_path"] / "config"
+    import json
+    (cfg_dir / "config.default.json").write_text(json.dumps({
+        "hook_pin": 17, "poll_interval_sec": 0, "pre_beep_delay_sec": 0,
+        "max_duration_sec": 60, "audio": {"sample_rate": 44100, "channels": 1},
+        "normalize_audio": False,
+    }))
+
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio") as mock_normalize:
+        main_module.main()
+
+    mock_normalize.assert_not_called()

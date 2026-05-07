@@ -8,6 +8,8 @@ from src.audio import AudioController
 from src.config import ConfigError, load as load_config
 from src.display import build as build_display
 from src.hook import HookSwitch
+from src.processing import normalize_audio
+from src.shutdown_button import build as build_shutdown_button
 from src.storage import build_recording_path, count_recordings, ensure_recordings_dir
 from src.usb import UsbStorage
 
@@ -24,6 +26,8 @@ _DEFAULTS = {
     "min_duration_sec": 1.0,
     "couple_name": "",
     "audio": {"sample_rate": 44100, "channels": 1},
+    "normalize_audio": True,
+    "shutdown_button": {"enabled": False},
 }
 
 
@@ -81,10 +85,12 @@ def main() -> None:
     )
     hook = HookSwitch(gpio_pin=cfg["hook_pin"], pull_up=True, bounce_time=0.05)
     display = build_display()
+    shutdown_btn = build_shutdown_button(cfg, on_shutdown=lambda: log.info("Arrêt demandé via bouton."))
 
     poll = cfg["poll_interval_sec"]
     pre_beep_delay = cfg["pre_beep_delay_sec"]
     min_duration = cfg.get("min_duration_sec", 1.0)
+    do_normalize = cfg.get("normalize_audio", True)
 
     message_count = count_recordings(recordings_dir)
     log.info("Système prêt (%d message(s) existant(s)).", message_count)
@@ -145,6 +151,8 @@ def main() -> None:
                         output_file.name,
                         output_file.stat().st_size / 1024,
                     )
+                    if do_normalize:
+                        normalize_audio(output_file)
                 else:
                     log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 
@@ -160,6 +168,7 @@ def main() -> None:
         audio.stop_recording()
         hook.close()
         display.clear()
+        shutdown_btn.close()
 
 
 def _wait_for_hangup(hook: HookSwitch, poll: float) -> None:
