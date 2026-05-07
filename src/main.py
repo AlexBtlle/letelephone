@@ -5,7 +5,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from src.audio import AudioController
-from src.config import load as load_config
+from src.config import ConfigError, load as load_config
 from src.hook import HookSwitch
 from src.storage import build_recording_path, ensure_recordings_dir
 from src.usb import UsbStorage
@@ -14,6 +14,14 @@ _BASE_DIR = Path(__file__).resolve().parent.parent
 _ASSETS_DIR = _BASE_DIR / "assets"
 _BEEP_FILE = _ASSETS_DIR / "beep.wav"
 _ERROR_FILE = _ASSETS_DIR / "error.wav"
+
+_DEFAULTS = {
+    "hook_pin": 17,
+    "poll_interval_sec": 0.05,
+    "pre_beep_delay_sec": 2.0,
+    "max_duration_sec": 180,
+    "audio": {"sample_rate": 44100, "channels": 1},
+}
 
 
 def _setup_logging(log_dir: Path) -> None:
@@ -29,20 +37,36 @@ def _setup_logging(log_dir: Path) -> None:
 
 
 def main() -> None:
-    cfg = load_config()
-
     usb = UsbStorage()
-    recordings_dir = usb.recordings_dir() if usb.is_available() else ensure_recordings_dir(_BASE_DIR)
-    log_dir = usb.log_dir() if usb.is_available() else _BASE_DIR / "logs"
 
+    # Logging bootstrap (before config, so we can log config errors)
+    log_dir = _BASE_DIR / "logs"
+    try:
+        log_dir = usb.log_dir() if usb.is_available() else _BASE_DIR / "logs"
+    except OSError:
+        pass
     _setup_logging(log_dir)
     log = logging.getLogger(__name__)
+
+    # Config — fall back to built-in defaults on any error
+    try:
+        cfg = load_config()
+    except ConfigError as exc:
+        log.error("Erreur de configuration : %s — utilisation des valeurs par défaut", exc)
+        cfg = _DEFAULTS.copy()
+        cfg["audio"] = _DEFAULTS["audio"].copy()
+
+    # Recordings directory — fall back to local if USB fails
+    try:
+        recordings_dir = usb.recordings_dir() if usb.is_available() else ensure_recordings_dir(_BASE_DIR)
+    except OSError as exc:
+        log.error("Impossible d'accéder au dossier USB (%s) — fallback local", exc)
+        recordings_dir = ensure_recordings_dir(_BASE_DIR)
 
     log.info("Démarrage. Enregistrements → %s", recordings_dir)
     if not usb.is_available():
         log.warning("Clé USB non détectée — enregistrements en local.")
 
-    # welcome.wav à la racine de la clé USB, sinon beep par défaut
     welcome_file = usb.welcome_file() or _BEEP_FILE
     log.info("Message d'accueil : %s", welcome_file.name)
 
@@ -60,7 +84,14 @@ def main() -> None:
 
     try:
         while True:
-            if hook.is_off_hook():
+            try:
+                off_hook = hook.is_off_hook()
+            except Exception as exc:
+                log.error("Erreur lecture GPIO : %s — nouvelle tentative dans 1s", exc)
+                time.sleep(1)
+                continue
+
+            if off_hook:
                 log.info("Décroché détecté.")
                 time.sleep(pre_beep_delay)
 
@@ -87,7 +118,11 @@ def main() -> None:
                 audio.stop_recording()
 
                 if output_file.exists() and output_file.stat().st_size > 0:
-                    log.info("Message enregistré : %s (%.1f ko)", output_file.name, output_file.stat().st_size / 1024)
+                    log.info(
+                        "Message enregistré : %s (%.1f ko)",
+                        output_file.name,
+                        output_file.stat().st_size / 1024,
+                    )
                 else:
                     log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 

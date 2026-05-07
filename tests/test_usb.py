@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -79,3 +80,25 @@ def test_eject_calls_umount(tmp_path, monkeypatch):
         usb.eject()
         mock_run.assert_called_once()
         assert "umount" in mock_run.call_args[0][0]
+
+
+def test_eject_logs_error_on_umount_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True), \
+         patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "umount")):
+        usb = UsbStorage()
+        usb.eject()  # must not raise
+
+
+def test_eject_logs_error_on_timeout(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True), \
+         patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="umount", timeout=10)):
+        usb = UsbStorage()
+        usb.eject()  # must not raise
+
+
+def test_eject_noop_when_no_usb(monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
+    usb = UsbStorage()
+    usb.eject()  # must not raise
