@@ -26,7 +26,7 @@
 
 ## 1. Brochage du Raspberry Pi (GPIO)
 
-Le connecteur GPIO est identique sur le Pi Zero 2 W et le Pi 4.  
+Le connecteur GPIO 40 broches est identique sur le Pi 3B+, Pi 4 et Pi 5.  
 Les pins utilisés sont indiqués en **gras**.
 
 ```

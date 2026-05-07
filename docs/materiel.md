@@ -4,9 +4,9 @@
 
 | Composant | Modèle recommandé | Prix indicatif | Où trouver |
 |---|---|---|---|
-| Raspberry Pi | Pi Zero 2 W ou Pi 4 (voir ci-dessous) | 15–40 € | raspberrypi.com, Amazon, Kubii |
+| Raspberry Pi | Pi 3B+, Pi 4 ou Pi 5 (voir ci-dessous) | 20–80 € | raspberrypi.com, Amazon, Kubii |
 | Carte microSD | Classe A1, 8 Go minimum | 5–10 € | Amazon, Fnac |
-| Alimentation | Officielle Raspberry Pi (5 V) | 8–12 € | Kubii, Amazon |
+| Alimentation | Officielle Raspberry Pi (5 V) | 8–15 € | Kubii, Amazon |
 | Combiné téléphonique | Socotel S63 | 5–20 € | Leboncoin, Vinted, brocantes |
 | Dongle audio USB | Tout dongle USB Audio Class (UAC) | 5–10 € | Amazon (ex : UGREEN, Sabrent, générique) |
 | Clé USB | 8 Go minimum | 5 € | Partout |
@@ -16,55 +16,32 @@
 | Composant | Utilité | Prix | Où trouver |
 |---|---|---|---|
 | Écran OLED SSD1306 128×64 I2C | Affichage du statut et du compteur de messages | 3–5 € | AliExpress, Amazon |
-| Hub USB OTG (Pi Zero 2 W uniquement) | Permet de brancher dongle + clé USB simultanément | 5–10 € | Amazon (ex : Waveshare USB HUB HAT) |
 | Boîtier imprimé 3D | Montage propre | — | À imprimer, fichiers à venir |
 
 ---
 
 ## Choisir son Raspberry Pi
 
-### Pi 4 — configuration simple (recommandée pour débuter)
+Les Pi 3B+, 4 et 5 partagent tous le même connecteur GPIO 40 broches et disposent de **plusieurs ports USB-A natifs**, ce qui évite tout hub USB externe.
 
-Le Pi 4 dispose de **4 ports USB-A natifs** : pas besoin de hub.
-Brancher directement le dongle audio et la clé USB.
+| Modèle | Ports USB-A | Dimensions | Prix indicatif | Notes |
+|---|---|---|---|---|
+| Pi 3B+ | 4 × USB-A 2.0 | 85 × 56 mm | ~20 € | Suffisant, plus difficile à trouver neuf |
+| Pi 4 | 2 × USB-A 2.0 + 2 × USB-A 3.0 | 85 × 56 mm | 35–55 € | Recommandé, largement disponible |
+| Pi 5 | 2 × USB-A 2.0 + 2 × USB-A 3.0 | 85 × 56 mm | 60–80 € | Plus puissant, GPIO via nouveau contrôleur RP1 |
 
 ```
-  Pi 4
+  Pi 3B+ / Pi 4 / Pi 5
   ┌──────────────────┐
   │ [USB-A] ← Dongle audio
   │ [USB-A] ← Clé USB
   │ [USB-A]   (libre)
   │ [USB-A]   (libre)
-  │ [USB-C] ← Alimentation
+  │ [USB-C] ← Alimentation (Pi 4/5) ou µUSB (Pi 3B+)
   └──────────────────┘
 ```
 
-Inconvénient : plus grand (85 × 56 mm), plus difficile à loger dans un boîtier de téléphone.
-
----
-
-### Pi Zero 2 W — configuration compacte (recommandée pour l'intégration)
-
-Le Pi Zero 2 W n'a qu'**un seul port micro-USB OTG**. Il faut un hub USB OTG pour brancher à la fois le dongle audio et la clé USB.
-
-```
-  Pi Zero 2 W
-  ┌───────────────────┐
-  │ [µUSB Power] ← Alimentation
-  │ [µUSB OTG]  ← Hub USB OTG
-  │                   │
-  └───────────────────┘
-                  Hub USB OTG
-                  ┌──────────────┐
-                  │ [USB-A] ← Dongle audio
-                  │ [USB-A] ← Clé USB
-                  └──────────────┘
-```
-
-> **Hub recommandé** : Waveshare USB HUB HAT, ou tout hub micro-USB OTG avec alimentation externe (~5–10 €).  
-> Certains hubs OTG se branchent directement sur les pins GPIO pour l'alimentation, évitant un câble USB-C séparé.
-
-Avantage : très compact (65 × 30 mm), s'intègre facilement dans un combiné ou un boîtier.
+> **Pi 5 :** Le contrôleur GPIO RP1 nécessite le backend `lgpio` pour la bibliothèque gpiozero. Le script `install.sh` installe automatiquement `python3-lgpio` et le logiciel détecte le Pi 5 au démarrage pour configurer le bon backend.
 
 ---
 

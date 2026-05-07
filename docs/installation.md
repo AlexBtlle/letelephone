@@ -2,17 +2,19 @@
 
 ## Pré-requis
 
-- Un Raspberry Pi Zero 2 W ou Pi 4 câblé selon le [guide de câblage](cablage.md)
+- Un **Raspberry Pi 3B+, 4 ou 5** câblé selon le [guide de câblage](cablage.md)
 - Une carte microSD (8 Go minimum, classe A1 recommandée)
-- Une connexion internet (câble Ethernet via adaptateur, ou Wi-Fi configuré)
+- Une connexion internet (Wi-Fi configuré ou câble Ethernet)
 - Un ordinateur pour flasher la carte SD
+
+> **Pi 5 :** Requiert **Raspberry Pi OS Bookworm** (2023+). Le script d'installation installe automatiquement le backend GPIO adapté (`python3-lgpio`).
 
 ---
 
 ## Étape 1 — Flasher Raspberry Pi OS
 
 1. Télécharger **Raspberry Pi Imager** sur [raspberrypi.com/software](https://www.raspberrypi.com/software/)
-2. Choisir **Raspberry Pi OS Lite (64-bit)** — pas d'interface graphique nécessaire
+2. Choisir **Raspberry Pi OS Lite (64-bit)** — Bookworm ou plus récent, pas d'interface graphique nécessaire
 3. Avant de flasher, cliquer sur l'icône engrenage et configurer :
    - **Nom d'hôte** : `letelephone`
    - **Activer SSH** : oui

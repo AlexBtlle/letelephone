@@ -48,7 +48,7 @@ sudo systemctl start letelephone
 
 ## Matériel requis
 
-- Raspberry Pi Zero 2 W ou Pi 4
+- Raspberry Pi 3B+, Pi 4 ou Pi 5
 - Combiné téléphonique vintage avec hook switch (ex : Socotel S63)
 - Dongle audio USB (tout modèle USB Audio Class)
 - Clé USB pour stocker les enregistrements

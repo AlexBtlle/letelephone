@@ -29,6 +29,7 @@ apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-gpiozero \
+    python3-lgpio \
     alsa-utils \
     ffmpeg
 
@@ -76,8 +77,5 @@ echo "  Consulter les logs :"
 echo "    journalctl -u $SERVICE_NAME -f"
 echo ""
 echo "  Préparer un événement :"
-echo "    python3 $REPO_DIR/scripts/prepare_event.py \"Alice & Bob\" 2026-06-15 welcome.m4a"
-echo ""
-echo "  Récupérer et livrer les enregistrements :"
-echo "    python3 $REPO_DIR/scripts/retrieve_and_upload.py"
+echo "    Copier welcome.wav et couple.txt à la racine de la clé USB"
 echo ""
