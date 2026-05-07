@@ -1,6 +1,5 @@
 import getpass
 import logging
-import os
 import subprocess
 from pathlib import Path
 
@@ -31,6 +30,13 @@ class UsbStorage:
         d = self._mount_point / "logs"
         d.mkdir(parents=True, exist_ok=True)
         return d
+
+    def welcome_file(self) -> Path | None:
+        """Return path to welcome.wav at USB root if it exists, else None."""
+        if not self.is_available():
+            return None
+        candidate = self._mount_point / "welcome.wav"  # type: ignore[operator]
+        return candidate if candidate.exists() else None
 
     def eject(self) -> None:
         if not self.is_available():

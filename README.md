@@ -1,19 +1,18 @@
 # Livre d'Or Audio
 
-Un **système de livre d'or audio** sur Raspberry Pi pour les mariages et événements. Les invités décrochent un combiné téléphonique vintage, entendent le message d'accueil du couple, puis enregistrent leur message vocal. Les fichiers sont sauvegardés sur une clé USB et livrés au couple via un lien de téléchargement.
+Un **système de livre d'or audio** sur Raspberry Pi pour les mariages et événements. Les invités décrochent un combiné téléphonique vintage, entendent le message d'accueil du couple, puis enregistrent leur message vocal. Les fichiers sont sauvegardés sur une clé USB.
 
 ---
 
 ## Fonctionnalités
 
 - **Détection du combiné** : hook switch GPIO, décrochage/raccrochage détectés automatiquement
-- **Message d'accueil personnalisé** : la voix du couple, configurée avant l'événement
+- **Message d'accueil personnalisé** : `welcome.wav` à la racine de la clé USB, bip par défaut si absent
 - **Enregistrement automatique** : démarre après l'annonce, s'arrête au raccrochage
 - **Durée maximale** : configurable (défaut 3 minutes)
-- **Sauvegarde sur clé USB** : enregistrements stockés sur la clé du client, fallback local si absente
-- **Son d'erreur** : le combiné indique une panne par un bip si le système ne peut pas enregistrer
+- **Sauvegarde sur clé USB** : dossier `enregistrements/`, fallback local si clé absente
+- **Son d'erreur** : bip si le système ne peut pas enregistrer
 - **Démarrage autonome** : service systemd, redémarrage automatique en cas de crash
-- **Livraison cloud** : script de mise en ZIP + upload WeTransfer pour envoyer un lien au couple
 
 ---
 
@@ -30,18 +29,14 @@ letelephone/
 │   ├── usb.py           # Détection et gestion de la clé USB
 │   └── selftest.py      # Contrôles au démarrage
 ├── config/
-│   ├── config.default.json   # Paramètres par défaut
-│   └── config.event.json     # Surcharge par événement (généré par prepare_event.py)
+│   └── config.default.json   # Paramètres (GPIO, durée…)
 ├── assets/
 │   ├── beep.wav              # Son d'accueil par défaut
 │   └── error.wav             # Son d'erreur
-├── scripts/
-│   ├── prepare_event.py      # Prépare un événement (message custom + config)
-│   └── retrieve_and_upload.py # Zippe et livre les enregistrements
 ├── systemd/
 │   └── letelephone.service   # Service systemd
-├── tests/                    # Tests pytest
-├── install.sh                # Script d'installation
+├── tests/
+├── install.sh
 └── pyproject.toml
 ```
 
@@ -79,12 +74,6 @@ cd letelephone
 sudo bash install.sh
 ```
 
-Le script installe automatiquement :
-- Les dépendances système (`python3`, `alsa-utils`, `ffmpeg`)
-- Le paquet Python et ses dépendances
-- Le service systemd (activé au démarrage)
-- Les dossiers `recordings/` et `logs/`
-
 ### Démarrer le service
 
 ```bash
@@ -96,56 +85,37 @@ sudo systemctl status letelephone
 
 ```bash
 journalctl -u letelephone -f
-# ou
-cat logs/letelephone.log
 ```
 
 ---
 
 ## Utilisation
 
-### Avant l'événement — préparer la personnalisation
+### Préparer un événement
 
-Envoie le message d'accueil enregistré par le couple (n'importe quel format : m4a, mp3, wav…) sur le Pi, puis lance :
+1. Enregistrer le message d'accueil du couple (ex. sur téléphone, puis transférer sur PC)
+2. Convertir en WAV mono 44100 Hz si besoin (via Audacity ou `ffmpeg -i welcome.m4a -ar 44100 -ac 1 welcome.wav`)
+3. Copier `welcome.wav` à la **racine** de la clé USB
 
-```bash
-python3 scripts/prepare_event.py "Alice & Bob" 2026-06-15 /chemin/vers/welcome.m4a
-sudo systemctl restart letelephone
-```
-
-Cela convertit le fichier audio en WAV et génère `config/config.event.json`.  
-Sans fichier audio, un bip standard est utilisé :
-
-```bash
-python3 scripts/prepare_event.py "Alice & Bob" 2026-06-15
-```
+Le téléphone détecte automatiquement le fichier au démarrage. Pour changer de message, remplacer simplement le fichier sur la clé.
 
 ### Pendant l'événement
 
-1. Brancher la clé USB du client dans le Pi → les enregistrements s'y sauvegardent automatiquement
-2. Tester : décrocher → bip/message → enregistrer quelques secondes → raccrocher
+1. Brancher la clé USB dans le Pi → les enregistrements s'y sauvegardent dans `enregistrements/`
+2. Tester : décrocher → message d'accueil → enregistrer → raccrocher
 3. Vérifier que le fichier apparaît sur la clé
 
-### Après l'événement — livrer les enregistrements
+### Après l'événement
 
-```bash
-# Avec clé API WeTransfer (https://developers.wetransfer.com)
-WETRANSFER_API_KEY=ton_api_key python3 scripts/retrieve_and_upload.py
-
-# Sans clé API : crée seulement le ZIP
-python3 scripts/retrieve_and_upload.py --no-upload
-```
-
-Le script produit un ZIP horodaté et envoie un lien de téléchargement au couple.
+Récupérer la clé USB, zipper le dossier `enregistrements/` et envoyer via WeTransfer ou autre.
 
 ### Configuration avancée
 
-Modifier `config/config.default.json` pour changer les paramètres globaux :
+Pour modifier le GPIO, la durée max, etc., éditer `config/config.default.json` :
 
 ```json
 {
   "hook_pin": 17,
-  "poll_interval_sec": 0.05,
   "pre_beep_delay_sec": 2.0,
   "max_duration_sec": 180,
   "audio": { "sample_rate": 44100, "channels": 1 }

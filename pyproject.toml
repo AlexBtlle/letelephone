@@ -4,22 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "letelephone"
-version = "0.2.0"
+version = "0.3.0"
 description = "Livre d'or audio sur Raspberry Pi"
 requires-python = ">=3.11"
 dependencies = [
     "gpiozero",
-    "requests",
 ]
 
 [project.scripts]
 letelephone = "src.main:main"
-letelephone-prepare = "scripts.prepare_event:main"
-letelephone-deliver = "scripts.retrieve_and_upload:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*", "scripts*"]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
