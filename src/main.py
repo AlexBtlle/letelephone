@@ -8,7 +8,7 @@ from src.audio import AudioController
 from src.config import ConfigError, load as load_config
 from src.display import build as build_display
 from src.hook import HookSwitch
-from src.processing import normalize_audio
+from src.processing import compress_to_mp3, normalize_audio
 from src.shutdown_button import build as build_shutdown_button
 from src.storage import build_recording_path, count_recordings, ensure_recordings_dir
 from src.usb import UsbStorage
@@ -27,6 +27,7 @@ _DEFAULTS = {
     "couple_name": "",
     "audio": {"sample_rate": 44100, "channels": 1},
     "normalize_audio": True,
+    "compress_mp3": {"enabled": True, "quality": 0},
     "shutdown_button": {"enabled": False},
 }
 
@@ -91,6 +92,9 @@ def main() -> None:
     pre_beep_delay = cfg["pre_beep_delay_sec"]
     min_duration = cfg.get("min_duration_sec", 1.0)
     do_normalize = cfg.get("normalize_audio", True)
+    mp3_cfg = cfg.get("compress_mp3", {})
+    do_compress = mp3_cfg.get("enabled", True)
+    mp3_quality = mp3_cfg.get("quality", 0)
 
     message_count = count_recordings(recordings_dir)
     log.info("Système prêt (%d message(s) existant(s)).", message_count)
@@ -153,6 +157,8 @@ def main() -> None:
                     )
                     if do_normalize:
                         normalize_audio(output_file)
+                    if do_compress:
+                        compress_to_mp3(output_file, quality=mp3_quality)
                 else:
                     log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 

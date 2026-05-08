@@ -46,3 +46,16 @@ def test_count_recordings_counts_only_message_wavs(tmp_path):
     (tmp_path / "other.wav").write_bytes(b"\x00")  # not counted
     (tmp_path / "message_test.txt").write_bytes(b"\x00")  # not counted
     assert count_recordings(tmp_path) == 2
+
+
+def test_count_recordings_counts_mp3_files(tmp_path):
+    (tmp_path / "message_2026-06-15_12-00-00.mp3").write_bytes(b"\x00")
+    (tmp_path / "message_2026-06-15_12-01-00.mp3").write_bytes(b"\x00")
+    assert count_recordings(tmp_path) == 2
+
+
+def test_count_recordings_counts_mixed_wav_and_mp3(tmp_path):
+    (tmp_path / "message_2026-06-15_12-00-00.wav").write_bytes(b"\x00")
+    (tmp_path / "message_2026-06-15_12-01-00.mp3").write_bytes(b"\x00")
+    (tmp_path / "other.mp3").write_bytes(b"\x00")  # not counted
+    assert count_recordings(tmp_path) == 2

@@ -16,4 +16,7 @@ def build_recording_path(recordings_dir: Path) -> Path:
 def count_recordings(recordings_dir: Path) -> int:
     if not recordings_dir.exists():
         return 0
-    return sum(1 for _ in recordings_dir.glob("message_*.wav"))
+    return sum(
+        1 for f in recordings_dir.iterdir()
+        if f.stem.startswith("message_") and f.suffix in (".wav", ".mp3")
+    )

@@ -75,6 +75,7 @@ def _run_main(env):
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
          patch("src.main.normalize_audio"), \
+         patch("src.main.compress_to_mp3"), \
          patch("src.main.time.sleep", return_value=None):
         main_module.main()
 
@@ -401,3 +402,56 @@ def test_main_normalize_skipped_when_disabled(env):
         main_module.main()
 
     mock_normalize.assert_not_called()
+
+
+def test_main_compress_called_after_normalize(env):
+    """compress_to_mp3 must be called once after a valid recording."""
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"), \
+         patch("src.main.compress_to_mp3") as mock_compress:
+        main_module.main()
+
+    mock_compress.assert_called_once_with(wav, quality=0)
+
+
+def test_main_compress_skipped_when_disabled(env):
+    """compress_to_mp3 must not be called when compress_mp3.enabled=false."""
+    import json
+    cfg_dir = env["tmp_path"] / "config"
+    (cfg_dir / "config.default.json").write_text(json.dumps({
+        "hook_pin": 17, "poll_interval_sec": 0, "pre_beep_delay_sec": 0,
+        "max_duration_sec": 60, "audio": {"sample_rate": 44100, "channels": 1},
+        "compress_mp3": {"enabled": False},
+    }))
+
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"), \
+         patch("src.main.compress_to_mp3") as mock_compress:
+        main_module.main()
+
+    mock_compress.assert_not_called()

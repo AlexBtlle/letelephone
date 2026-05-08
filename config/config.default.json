@@ -10,6 +10,10 @@
     "channels": 1
   },
   "normalize_audio": true,
+  "compress_mp3": {
+    "enabled": true,
+    "quality": 0
+  },
   "shutdown_button": {
     "enabled": false,
     "pin": 27,

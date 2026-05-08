@@ -33,3 +33,40 @@ def normalize_audio(wav_path: Path) -> None:
         tmp.unlink(missing_ok=True)
     except FileNotFoundError:
         log.warning("ffmpeg introuvable — normalisation ignorée")
+
+
+def compress_to_mp3(wav_path: Path, quality: int = 0) -> Path | None:
+    """Convert WAV to MP3 HD using libmp3lame VBR. Deletes the WAV on success.
+
+    quality: VBR level 0 (best, ~245 kbps) to 9 (smallest). Default 0.
+    Returns the MP3 Path on success, None on failure (WAV preserved).
+    """
+    if not wav_path.exists():
+        log.warning("compress_to_mp3: fichier introuvable %s", wav_path)
+        return None
+    mp3_path = wav_path.with_suffix(".mp3")
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(wav_path),
+                "-codec:a", "libmp3lame", "-q:a", str(quality),
+                str(mp3_path),
+            ],
+            capture_output=True,
+            timeout=120,
+            check=True,
+        )
+        wav_path.unlink()
+        log.info("MP3 HD : %s (%.1f ko)", mp3_path.name, mp3_path.stat().st_size / 1024)
+        return mp3_path
+    except subprocess.CalledProcessError as exc:
+        log.warning("Compression MP3 échouée pour %s : %s", wav_path.name, exc.stderr[-200:] if exc.stderr else "")
+        mp3_path.unlink(missing_ok=True)
+        return None
+    except subprocess.TimeoutExpired:
+        log.warning("Compression MP3 timeout pour %s", wav_path.name)
+        mp3_path.unlink(missing_ok=True)
+        return None
+    except FileNotFoundError:
+        log.warning("ffmpeg introuvable — compression MP3 ignorée")
+        return None
