@@ -84,7 +84,9 @@ class AudioController:
                 try:
                     self._recording_process.wait(timeout=3)
                 except subprocess.TimeoutExpired:
-                    log.error("Processus arecord impossible à tuer (PID %s)", self._recording_process.pid)
+                    pid = self._recording_process.pid
+                    self._recording_process = None
+                    raise RuntimeError(f"Processus arecord impossible à tuer (PID {pid})")
             log.info("Enregistrement arrêté.")
         self._recording_process = None
 

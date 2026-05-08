@@ -59,12 +59,12 @@ def main() -> None:
         cfg = load_config()
     except ConfigError as exc:
         log.error("Erreur de configuration : %s — utilisation des valeurs par défaut", exc)
-        cfg = _DEFAULTS.copy()
-        cfg["audio"] = _DEFAULTS["audio"].copy()
+        import copy
+        cfg = copy.deepcopy(_DEFAULTS)
 
     try:
         recordings_dir = usb.recordings_dir() if usb.is_available() else ensure_recordings_dir(_BASE_DIR)
-    except OSError as exc:
+    except (OSError, RuntimeError) as exc:
         log.error("Impossible d'accéder au dossier USB (%s) — fallback local", exc)
         recordings_dir = ensure_recordings_dir(_BASE_DIR)
 
@@ -147,13 +147,17 @@ def main() -> None:
                     _wait_for_hangup(hook, poll)
                     continue
 
-                if output_file.exists() and output_file.stat().st_size > 0:
+                try:
+                    file_size = output_file.stat().st_size
+                except OSError:
+                    file_size = 0
+                if file_size > 0:
                     message_count += 1
                     log.info(
                         "Message #%d enregistré : %s (%.1f ko)",
                         message_count,
                         output_file.name,
-                        output_file.stat().st_size / 1024,
+                        file_size / 1024,
                     )
                     if do_normalize:
                         normalize_audio(output_file)

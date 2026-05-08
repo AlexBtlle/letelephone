@@ -26,7 +26,7 @@ def normalize_audio(wav_path: Path) -> None:
         tmp.replace(wav_path)
         log.info("Audio normalisé : %s", wav_path.name)
     except subprocess.CalledProcessError as exc:
-        log.warning("Normalisation échouée pour %s : %s", wav_path.name, exc.stderr[-200:] if exc.stderr else "")
+        log.warning("Normalisation échouée pour %s : %s", wav_path.name, exc.stderr[-200:].decode("utf-8", errors="replace") if exc.stderr else "")
         tmp.unlink(missing_ok=True)
     except subprocess.TimeoutExpired:
         log.warning("Normalisation timeout pour %s", wav_path.name)
@@ -60,7 +60,7 @@ def compress_to_mp3(wav_path: Path, quality: int = 0) -> Path | None:
         log.info("MP3 HD : %s (%.1f ko)", mp3_path.name, mp3_path.stat().st_size / 1024)
         return mp3_path
     except subprocess.CalledProcessError as exc:
-        log.warning("Compression MP3 échouée pour %s : %s", wav_path.name, exc.stderr[-200:] if exc.stderr else "")
+        log.warning("Compression MP3 échouée pour %s : %s", wav_path.name, exc.stderr[-200:].decode("utf-8", errors="replace") if exc.stderr else "")
         mp3_path.unlink(missing_ok=True)
         return None
     except subprocess.TimeoutExpired:

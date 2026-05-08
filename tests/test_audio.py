@@ -149,13 +149,14 @@ def test_stop_recording_kills_if_terminate_times_out(audio):
     assert audio._recording_process is None
 
 
-def test_stop_recording_logs_error_if_kill_also_times_out(audio):
+def test_stop_recording_raises_if_kill_also_times_out(audio):
     mock_proc = MagicMock()
     mock_proc.poll.return_value = None
+    mock_proc.pid = 9999
     mock_proc.wait.side_effect = subprocess.TimeoutExpired(cmd="arecord", timeout=5)
     audio._recording_process = mock_proc
-    # Must not raise even if kill+wait also times out
-    audio.stop_recording()
+    with pytest.raises(RuntimeError, match="9999"):
+        audio.stop_recording()
     assert audio._recording_process is None
 
 

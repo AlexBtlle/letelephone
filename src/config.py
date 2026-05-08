@@ -1,5 +1,8 @@
 import json
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 _DEFAULT_CONFIG = _BASE_DIR / "config" / "config.default.json"
@@ -31,11 +34,7 @@ def load() -> dict:
                 event_override = json.load(f)
             _deep_merge(cfg, event_override)
         except json.JSONDecodeError as exc:
-            # Override file is optional — warn and continue with defaults
-            import logging
-            logging.getLogger(__name__).warning(
-                "config.event.json invalide, ignoré : %s", exc
-            )
+            log.warning("config.event.json invalide, ignoré : %s", exc)
 
     return cfg
 

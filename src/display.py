@@ -58,6 +58,7 @@ class OledDisplay:
 
     def clear(self) -> None:
         self._device.clear()
+        self._device.cleanup()
 
     def _draw(self, couple_name: str, status: str, message_count: int) -> None:
         with canvas(self._device) as draw:

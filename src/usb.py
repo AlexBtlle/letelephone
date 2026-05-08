@@ -20,13 +20,15 @@ class UsbStorage:
         return self._mount_point is not None and self._mount_point.is_mount()
 
     def recordings_dir(self) -> Path:
-        assert self._mount_point is not None
+        if self._mount_point is None:
+            raise RuntimeError("Clé USB non disponible")
         d = self._mount_point / "enregistrements"
         d.mkdir(parents=True, exist_ok=True)
         return d
 
     def log_dir(self) -> Path:
-        assert self._mount_point is not None
+        if self._mount_point is None:
+            raise RuntimeError("Clé USB non disponible")
         d = self._mount_point / "logs"
         d.mkdir(parents=True, exist_ok=True)
         return d
@@ -35,14 +37,14 @@ class UsbStorage:
         """Return path to welcome.wav at USB root if it exists, else None."""
         if not self.is_available():
             return None
-        candidate = self._mount_point / "welcome.wav"  # type: ignore[operator]
+        candidate = self._mount_point / "welcome.wav"
         return candidate if candidate.exists() else None
 
     def couple_name(self) -> str:
         """Return content of couple.txt at USB root, stripped, or empty string."""
         if not self.is_available():
             return ""
-        candidate = self._mount_point / "couple.txt"  # type: ignore[operator]
+        candidate = self._mount_point / "couple.txt"
         if not candidate.exists():
             return ""
         try:
