@@ -1,41 +1,63 @@
-# Livre d'Or Audio
+# Le Téléphone — Livre d'or audio pour mariages
 
-Un système de livre d'or audio sur Raspberry Pi pour les mariages et événements.  
-Les invités décrochent un combiné téléphonique vintage, entendent le message d'accueil du couple, et enregistrent leur message vocal. Les fichiers sont sauvegardés sur une clé USB.
+Un vieux téléphone vintage branché à un Raspberry Pi. Les invités décrochent, entendent un mot du couple, et laissent leur message vocal. Les enregistrements sont sauvegardés automatiquement sur une clé USB.
 
 ---
 
-## Démonstration
+## Comment ça marche
+
+```
+  L'invité décroche          Le message d'accueil       L'invité parle
+  ───────────────            ──────────────────         ─────────────
+       ↓                     du couple se joue              ↓
+  L'écran passe en                    ↓              L'invité raccroche
+  mode ENREGISTREMENT          C'est parti !                 ↓
+                                                  Le fichier est sauvegardé
+                                                  sur la clé USB
+```
+
+L'écran OLED (optionnel) affiche en permanence :
 
 ```
 ┌────────────────────────┐
-│ Alice & Bob            │  ← nom du couple (couple.txt sur la clé)
+│ Alice & Bob            │  ← nom du couple
 │                        │
 │ EN ATTENTE             │  ← statut en temps réel
 │                        │
-│ Messages : 7           │  ← compteur automatique
+│ Messages : 7           │  ← nombre de messages enregistrés
 └────────────────────────┘
 ```
 
-1. L'invité décroche le combiné
-2. Le message d'accueil du couple se joue (ou un bip)
-3. L'invité enregistre son message et raccroche
-4. Le fichier WAV est sauvegardé sur la clé USB
+---
+
+## Deux configurations possibles
+
+| | Configuration standard | Configuration compacte |
+|---|---|---|
+| **Carte** | Pi 3B+, Pi 4 ou Pi 5 | Pi Zero 2 WH |
+| **Audio** | Dongle USB (~8€) | IQaudio Codec Zero HAT (~18€) |
+| **Prix total** | ~80–100 € | ~60 € |
+| **Encombrement** | Normal | Très petit |
+| **Montage** | Simple | Simple (HAT emboîté) |
+
+> Le Pi Zero 2 W avec Codec Zero est l'option la plus économique. Le script d'installation configure tout automatiquement.
+
+Voir le [guide matériel complet](docs/materiel.md) pour la liste précise des composants et les liens d'achat.
 
 ---
 
 ## Documentation
 
-| Guide | Description |
-|---|---|
-| [Matériel](docs/materiel.md) | Liste des composants, prix, où acheter |
-| [Câblage](docs/cablage.md) | Schémas de câblage complets (hook switch, audio, OLED) |
-| [Installation](docs/installation.md) | Mise en place du logiciel pas à pas |
-| [Utilisation](docs/utilisation.md) | Préparer un événement, gérer les enregistrements |
+| Guide | Pour qui | Contenu |
+|---|---|---|
+| [Matériel](docs/materiel.md) | Avant d'acheter | Listes de composants, prix, où acheter, conseils |
+| [Câblage](docs/cablage.md) | Au moment de monter | Schémas fil à fil, photos de référence |
+| [Installation](docs/installation.md) | Une seule fois | Mise en place du logiciel, étape par étape |
+| [Utilisation](docs/utilisation.md) | Avant chaque événement | Préparer la clé USB, dépannage, récupérer les messages |
 
 ---
 
-## Installation rapide
+## Installation en 4 commandes
 
 ```bash
 git clone https://github.com/AlexBtlle/letelephone.git
@@ -44,61 +66,37 @@ sudo bash install.sh
 sudo systemctl start letelephone
 ```
 
----
-
-## Matériel requis
-
-- Raspberry Pi 3B+, Pi 4 ou Pi 5
-- Combiné téléphonique vintage avec hook switch (ex : Socotel S63)
-- Dongle audio USB (tout modèle USB Audio Class)
-- Clé USB pour stocker les enregistrements
-- Écran OLED SSD1306 I2C 128×64 (optionnel)
-
-Voir le [guide matériel complet](docs/materiel.md) pour les références et les prix.
+> Sur Pi Zero 2 W avec Codec Zero, le script détecte automatiquement la carte et configure le pilote audio. Un redémarrage est demandé si nécessaire.
 
 ---
 
-## Architecture du projet
+## Fonctionnalités
 
-```
-letelephone/
-├── src/
-│   ├── main.py          # Boucle principale
-│   ├── config.py        # Chargement de la configuration
-│   ├── audio.py         # Lecture / enregistrement (auto-détection ALSA)
-│   ├── hook.py          # Détection hook switch (GPIO)
-│   ├── display.py       # Afficheur OLED SSD1306 (optionnel)
-│   ├── storage.py       # Gestion des chemins d'enregistrement
-│   ├── usb.py           # Détection et gestion de la clé USB
-│   └── selftest.py      # Contrôles au démarrage
-├── config/
-│   └── config.default.json   # Paramètres (GPIO, durée…)
-├── assets/
-│   ├── beep.wav              # Son d'accueil par défaut
-│   └── error.wav             # Son d'erreur
-├── docs/                     # Documentation complète
-├── systemd/
-│   └── letelephone.service
-├── tests/                    # 94 tests pytest
-├── install.sh
-└── pyproject.toml
-```
+- **Décrochage automatique** — détection du hook switch via GPIO, sans délai
+- **Message d'accueil personnalisé** — fichier `welcome.wav` sur la clé USB (bip par défaut)
+- **Normalisation audio** — tous les messages au même volume, sans intervention manuelle
+- **Compression MP3** — les messages sont convertis en MP3 haute qualité, 5× plus légers que le WAV
+- **Écran OLED** — affichage du statut et du compteur en temps réel (optionnel)
+- **Bouton d'arrêt** — appui 3 secondes pour éteindre proprement le Pi (optionnel)
+- **Sauvegarde USB automatique** — fallback local si la clé est absente
+- **Auto-test au démarrage** — détecte les problèmes avant l'événement
+- **Compatible Pi 3B+, Pi 4, Pi 5, Pi Zero 2 W** — un seul logiciel pour toutes les cartes
 
 ---
 
-## Workflow clé USB
+## Clé USB — workflow rapide
 
-Deux fichiers optionnels à placer à la racine de la clé USB :
+Deux fichiers à placer à la racine de la clé avant l'événement :
 
 | Fichier | Rôle |
 |---|---|
-| `welcome.wav` | Message d'accueil du couple (WAV mono 44 100 Hz) |
-| `couple.txt` | Nom du couple affiché sur l'écran |
+| `welcome.wav` | Message d'accueil enregistré par le couple |
+| `couple.txt` | Nom affiché sur l'écran (`Alice & Bob`) |
 
-Les enregistrements sont sauvegardés automatiquement dans `enregistrements/` sur la clé.
+Les messages sont sauvegardés automatiquement dans `enregistrements/` sur la clé, au format MP3.
 
 ---
 
 ## Licence
 
-Licence **GNU GPL v3**. Voir `LICENSE` pour plus de détails.
+GNU GPL v3 — voir `LICENSE`.
