@@ -36,6 +36,22 @@ def test_detect_alsa_finds_usb():
         assert _detect_usb_alsa_device("capture") == "hw:2,0"
 
 
+def test_detect_alsa_finds_iqaudio():
+    fake_output = "card 1: IQaudIOCODEC [IQaudIO CODEC Zero], device 0: IQaudIO CODEC HiFi da7212-hifi-0\n"
+    mock_result = MagicMock()
+    mock_result.stdout = fake_output
+    with patch("subprocess.run", return_value=mock_result):
+        assert _detect_usb_alsa_device("capture") == "hw:1,0"
+
+
+def test_detect_alsa_finds_da7212():
+    fake_output = "card 1: DA7212 [DA7212 Audio], device 0: DA7212 HiFi da7212-0\n"
+    mock_result = MagicMock()
+    mock_result.stdout = fake_output
+    with patch("subprocess.run", return_value=mock_result):
+        assert _detect_usb_alsa_device("capture") == "hw:1,0"
+
+
 def test_detect_alsa_fallback_on_no_usb():
     mock_result = MagicMock()
     mock_result.stdout = "card 0: bcm2835 [bcm2835 ALSA], device 0: ...\n"

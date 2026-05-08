@@ -6,15 +6,18 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
+_ALSA_KEYWORDS = ("USB Audio", "USB-Audio", "IQaudIO", "DA7212")
+
+
 def _detect_usb_alsa_device(stream: str) -> str:
-    """Return the first USB Audio card/device found via aplay/arecord -l, or 'default'."""
+    """Return the first USB Audio or IQaudio Codec Zero card/device found via aplay/arecord -l, or 'default'."""
     try:
         result = subprocess.run(
             ["arecord" if stream == "capture" else "aplay", "-l"],
             capture_output=True, text=True, timeout=5,
         )
         for line in result.stdout.splitlines():
-            if "USB Audio" in line or "USB-Audio" in line:
+            if any(kw in line for kw in _ALSA_KEYWORDS):
                 m = re.search(r"card (\d+):.*device (\d+):", line)
                 if m:
                     return f"hw:{m.group(1)},{m.group(2)}"

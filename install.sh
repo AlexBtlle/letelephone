@@ -58,6 +58,31 @@ sed \
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
+# ── IQaudio Codec Zero (Pi Zero 2 W) ─────────────────────────────────────────
+REBOOT_REQUIRED=false
+if grep -q "Zero 2" /proc/cpuinfo 2>/dev/null; then
+    info "Raspberry Pi Zero 2 W détecté — configuration de l'IQaudio Codec Zero..."
+
+    if [[ -f /boot/firmware/config.txt ]]; then
+        BOOT_CONFIG="/boot/firmware/config.txt"
+    elif [[ -f /boot/config.txt ]]; then
+        BOOT_CONFIG="/boot/config.txt"
+    else
+        warn "Fichier config.txt introuvable — ajoutez manuellement : dtoverlay=iqaudio-codec"
+        BOOT_CONFIG=""
+    fi
+
+    if [[ -n "$BOOT_CONFIG" ]]; then
+        if grep -q "dtoverlay=iqaudio-codec" "$BOOT_CONFIG"; then
+            info "dtoverlay=iqaudio-codec déjà présent dans $BOOT_CONFIG"
+        else
+            echo "dtoverlay=iqaudio-codec" >> "$BOOT_CONFIG"
+            info "dtoverlay=iqaudio-codec ajouté dans $BOOT_CONFIG"
+            REBOOT_REQUIRED=true
+        fi
+    fi
+fi
+
 # ── Permissions audio ─────────────────────────────────────────────────────────
 if ! groups "$INSTALL_USER" | grep -q audio; then
     info "Ajout de $INSTALL_USER au groupe audio..."
@@ -79,3 +104,11 @@ echo ""
 echo "  Préparer un événement :"
 echo "    Copier welcome.wav et couple.txt à la racine de la clé USB"
 echo ""
+
+if [[ "$REBOOT_REQUIRED" == "true" ]]; then
+    echo -e "${YELLOW}╔══════════════════════════════════════════════════════╗${NC}"
+    echo -e "${YELLOW}║  REDÉMARRAGE REQUIS pour activer l'IQaudio Codec Zero║${NC}"
+    echo -e "${YELLOW}║         sudo reboot                                  ║${NC}"
+    echo -e "${YELLOW}╚══════════════════════════════════════════════════════╝${NC}"
+    echo ""
+fi

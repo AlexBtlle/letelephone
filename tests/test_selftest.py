@@ -79,6 +79,46 @@ def test_check_audio_devices_timeout():
         assert st.check_audio_devices() is False
 
 
+# ── check_codec_zero ─────────────────────────────────────────────────────────
+
+def test_check_codec_zero_not_pi_zero2():
+    with patch("src.selftest._is_pi_zero2", return_value=False):
+        assert st.check_codec_zero() is True
+
+
+def test_check_codec_zero_pi_zero2_with_iqaudio():
+    result = MagicMock(stdout="card 1: IQaudIOCODEC [IQaudIO CODEC Zero], device 0: ...\n")
+    with patch("src.selftest._is_pi_zero2", return_value=True), \
+         patch("subprocess.run", return_value=result):
+        assert st.check_codec_zero() is True
+
+
+def test_check_codec_zero_pi_zero2_with_da7212():
+    result = MagicMock(stdout="card 1: DA7212 [DA7212 Audio], device 0: ...\n")
+    with patch("src.selftest._is_pi_zero2", return_value=True), \
+         patch("subprocess.run", return_value=result):
+        assert st.check_codec_zero() is True
+
+
+def test_check_codec_zero_pi_zero2_missing_hat():
+    result = MagicMock(stdout="card 0: bcm2835 [bcm2835 ALSA], device 0: ...\n")
+    with patch("src.selftest._is_pi_zero2", return_value=True), \
+         patch("subprocess.run", return_value=result):
+        assert st.check_codec_zero() is False
+
+
+def test_check_codec_zero_pi_zero2_aplay_not_found():
+    with patch("src.selftest._is_pi_zero2", return_value=True), \
+         patch("subprocess.run", side_effect=FileNotFoundError):
+        assert st.check_codec_zero() is False
+
+
+def test_check_codec_zero_pi_zero2_timeout():
+    with patch("src.selftest._is_pi_zero2", return_value=True), \
+         patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="aplay", timeout=5)):
+        assert st.check_codec_zero() is False
+
+
 # ── check_usb_writable ────────────────────────────────────────────────────────
 
 def test_check_usb_no_media_dir(monkeypatch):
@@ -100,6 +140,7 @@ def test_check_usb_writable_ok(tmp_path, monkeypatch):
 def test_run_returns_false_on_critical_failure(patch_base):
     # No config, no beep — both critical checks fail
     with patch("src.selftest.check_audio_devices", return_value=True), \
+         patch("src.selftest.check_codec_zero", return_value=True), \
          patch("src.selftest._play_error"):
         result = st.run()
     assert result is False
@@ -111,5 +152,6 @@ def test_run_returns_true_when_all_ok(patch_base):
            "max_duration_sec": 180, "audio": {"sample_rate": 44100, "channels": 1}}
     (patch_base / "config" / "config.default.json").write_text(json.dumps(cfg))
     with patch("src.selftest.check_audio_devices", return_value=True), \
+         patch("src.selftest.check_codec_zero", return_value=True), \
          patch("src.selftest.check_usb_writable", return_value=True):
         assert st.run() is True

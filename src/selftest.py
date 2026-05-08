@@ -66,6 +66,37 @@ def check_config() -> bool:
         return False
 
 
+def _is_pi_zero2() -> bool:
+    try:
+        with open("/proc/cpuinfo") as f:
+            return "Zero 2" in f.read()
+    except OSError:
+        return False
+
+
+def check_codec_zero() -> bool:
+    """Critical: on Pi Zero 2 W, IQaudio Codec Zero must appear in aplay -l."""
+    if not _is_pi_zero2():
+        return True
+    try:
+        result = subprocess.run(["aplay", "-l"], capture_output=True, text=True, timeout=5)
+        if any(kw in result.stdout for kw in ("IQaudIO", "DA7212")):
+            log.info("selftest: IQaudio Codec Zero détecté OK")
+            return True
+        log.error(
+            "selftest: Pi Zero 2 W détecté mais Codec Zero absent. "
+            "Vérifiez que dtoverlay=iqaudio-codec est dans /boot/firmware/config.txt "
+            "et redémarrez le Pi."
+        )
+        return False
+    except FileNotFoundError:
+        log.error("selftest: aplay introuvable — alsa-utils non installé ?")
+        return False
+    except subprocess.TimeoutExpired:
+        log.error("selftest: timeout aplay -l (check_codec_zero)")
+        return False
+
+
 def check_usb_writable() -> bool:
     """Non-blocking: warns but doesn't fail if USB absent."""
     import getpass
@@ -98,6 +129,7 @@ def run() -> bool:
     ok &= check_config()
     ok &= check_beep_file()
     ok &= check_audio_devices()
+    ok &= check_codec_zero()
     check_usb_writable()  # warning only
     if ok:
         log.info("selftest: tous les contrôles OK")
