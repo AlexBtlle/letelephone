@@ -1,10 +1,14 @@
 import logging
 import subprocess
-from typing import Callable
+from typing import Callable, Protocol
 
 from gpiozero import Button
 
 log = logging.getLogger(__name__)
+
+
+class _ShutdownButtonProtocol(Protocol):
+    def close(self) -> None: ...
 
 
 class _NoOpShutdownButton:
@@ -41,7 +45,7 @@ class ShutdownButton:
 def build(
     cfg: dict,
     on_shutdown: Callable[[], None] | None = None,
-) -> ShutdownButton | _NoOpShutdownButton:
+) -> _ShutdownButtonProtocol:
     btn_cfg = cfg.get("shutdown_button", {})
     if not btn_cfg.get("enabled", False):
         return _NoOpShutdownButton()

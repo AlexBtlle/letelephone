@@ -1,6 +1,5 @@
 import getpass
 import logging
-import subprocess
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -48,22 +47,10 @@ class UsbStorage:
         if not candidate.exists():
             return ""
         try:
-            return candidate.read_text(encoding="utf-8").strip()
+            return candidate.read_text(encoding="utf-8-sig").strip()
         except OSError as exc:
             log.warning("Impossible de lire couple.txt : %s", exc)
             return ""
-
-    def eject(self) -> None:
-        if not self.is_available():
-            return
-        try:
-            subprocess.run(["umount", str(self._mount_point)], check=True, timeout=10)
-            log.info("Clé USB éjectée : %s", self._mount_point)
-        except subprocess.CalledProcessError as exc:
-            log.error("Échec éjection USB : %s", exc)
-        except subprocess.TimeoutExpired:
-            log.error("Timeout éjection USB")
-
 
 def _find_mount_point() -> Path | None:
     user = getpass.getuser()

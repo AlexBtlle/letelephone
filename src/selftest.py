@@ -4,6 +4,8 @@ Exits 0 if all checks pass, 1 if a critical check fails (systemd will not start 
 Plays error.wav on critical failure so the operator hears the problem.
 """
 
+import getpass
+import json
 import logging
 import subprocess
 import sys
@@ -57,7 +59,6 @@ def check_config() -> bool:
         log.error("selftest: config/config.default.json introuvable")
         return False
     try:
-        import json
         with open(config_path) as f:
             json.load(f)
         return True
@@ -99,7 +100,6 @@ def check_codec_zero() -> bool:
 
 def check_usb_writable() -> bool:
     """Non-blocking: warns but doesn't fail if USB absent."""
-    import getpass
     base = Path("/media") / getpass.getuser()
     if not base.is_dir():
         log.warning("selftest: %s introuvable, pas de clé USB détectée", base)

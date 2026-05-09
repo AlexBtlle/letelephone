@@ -73,37 +73,6 @@ def test_find_mount_point_returns_none_if_nothing_mounted(monkeypatch, tmp_path)
     assert _find_mount_point() is None
 
 
-def test_eject_calls_umount(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
-    with patch.object(Path, "is_mount", return_value=True), patch("subprocess.run") as mock_run:
-        usb = UsbStorage()
-        usb.eject()
-        mock_run.assert_called_once()
-        assert "umount" in mock_run.call_args[0][0]
-
-
-def test_eject_logs_error_on_umount_failure(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
-    with patch.object(Path, "is_mount", return_value=True), \
-         patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "umount")):
-        usb = UsbStorage()
-        usb.eject()  # must not raise
-
-
-def test_eject_logs_error_on_timeout(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
-    with patch.object(Path, "is_mount", return_value=True), \
-         patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="umount", timeout=10)):
-        usb = UsbStorage()
-        usb.eject()  # must not raise
-
-
-def test_eject_noop_when_no_usb(monkeypatch):
-    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
-    usb = UsbStorage()
-    usb.eject()  # must not raise
-
-
 # ── couple_name() ─────────────────────────────────────────────────────────────
 
 def test_couple_name_read_from_file(tmp_path, monkeypatch):
@@ -133,6 +102,14 @@ def test_couple_name_no_usb_returns_empty(monkeypatch):
     monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
     usb = UsbStorage()
     assert usb.couple_name() == ""
+
+
+def test_couple_name_strips_bom(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_bytes(b"\xef\xbb\xbfAlice & Bob\n")  # UTF-8 BOM (Windows Notepad)
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Alice & Bob"
 
 
 def test_couple_name_os_error_returns_empty(tmp_path, monkeypatch):

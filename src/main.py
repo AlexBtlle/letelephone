@@ -1,3 +1,4 @@
+import copy
 import logging
 import sys
 import time
@@ -59,7 +60,6 @@ def main() -> None:
         cfg = load_config()
     except ConfigError as exc:
         log.error("Erreur de configuration : %s — utilisation des valeurs par défaut", exc)
-        import copy
         cfg = copy.deepcopy(_DEFAULTS)
 
     try:
