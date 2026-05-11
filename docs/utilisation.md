@@ -163,7 +163,14 @@ MA-CLÉ-USB/
     └── ...
 ```
 
-Les fichiers MP3 sont compatibles avec tous les lecteurs (téléphone, ordinateur, tablette). Ils sont automatiquement normalisés (volume équilibré) et compressés — chaque fichier pèse environ 1–3 Mo.
+Pour chaque message, deux fichiers MP3 sont créés :
+
+| Fichier | Contenu |
+|---|---|
+| `message_YYYY-MM-DD_HH-MM-SS.mp3` | Enregistrement brut normalisé |
+| `message_YYYY-MM-DD_HH-MM-SS_vocal.mp3` | Version traitée — voix mise en avant, musique de fond atténuée |
+
+Commencer par écouter les versions `_vocal`. Si le résultat n'est pas satisfaisant, les versions brutes sont toujours disponibles.
 
 ---
 

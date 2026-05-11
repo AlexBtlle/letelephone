@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.processing import compress_to_mp3, normalize_audio
+from src.processing import compress_to_mp3, isolate_voice, normalize_audio
 
 
 def test_normalize_audio_success(tmp_path):
@@ -148,3 +148,89 @@ def test_compress_to_mp3_uses_quality_param(tmp_path):
 
     assert "-q:a" in captured["cmd"]
     assert "2" in captured["cmd"]
+
+
+# ── isolate_voice ─────────────────────────────────────────────────────────────
+
+def test_isolate_voice_creates_vocal_file(tmp_path):
+    wav = tmp_path / "message_2026-01-01_12-00-00.wav"
+    wav.write_bytes(b"\x00" * 100)
+    vocal = tmp_path / "message_2026-01-01_12-00-00_vocal.wav"
+
+    def fake_run(*args, **kwargs):
+        vocal.write_bytes(b"\x00" * 80)
+        return MagicMock(returncode=0)
+
+    with patch("src.processing.subprocess.run", side_effect=fake_run):
+        result = isolate_voice(wav)
+
+    assert result == vocal
+    assert vocal.exists()
+    assert wav.exists()  # original untouched
+
+
+def test_isolate_voice_uses_voice_filters(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"\x00" * 100)
+    vocal = tmp_path / "test_vocal.wav"
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        vocal.write_bytes(b"\x00" * 80)
+        return MagicMock(returncode=0)
+
+    with patch("src.processing.subprocess.run", side_effect=fake_run):
+        isolate_voice(wav)
+
+    assert "-af" in captured["cmd"]
+    af_value = captured["cmd"][captured["cmd"].index("-af") + 1]
+    assert "highpass" in af_value
+    assert "lowpass" in af_value
+    assert "afftdn" in af_value
+
+
+def test_isolate_voice_missing_file(tmp_path, caplog):
+    result = isolate_voice(tmp_path / "nonexistent.wav")
+    assert result is None
+    assert "introuvable" in caplog.text
+
+
+def test_isolate_voice_ffmpeg_failure(tmp_path, caplog):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"\x00" * 100)
+    exc = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"error")
+    with patch("src.processing.subprocess.run", side_effect=exc):
+        result = isolate_voice(wav)
+    assert result is None
+    assert wav.exists()
+    assert "Isolation voix échouée" in caplog.text
+
+
+def test_isolate_voice_cleans_partial_file_on_failure(tmp_path):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"\x00" * 100)
+    vocal = tmp_path / "test_vocal.wav"
+    vocal.write_bytes(b"\x00" * 20)
+    exc = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"")
+    with patch("src.processing.subprocess.run", side_effect=exc):
+        isolate_voice(wav)
+    assert not vocal.exists()
+
+
+def test_isolate_voice_timeout(tmp_path, caplog):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"\x00" * 100)
+    with patch("src.processing.subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 120)):
+        result = isolate_voice(wav)
+    assert result is None
+    assert "timeout" in caplog.text
+
+
+def test_isolate_voice_ffmpeg_not_found(tmp_path, caplog):
+    wav = tmp_path / "test.wav"
+    wav.write_bytes(b"\x00" * 100)
+    with patch("src.processing.subprocess.run", side_effect=FileNotFoundError):
+        result = isolate_voice(wav)
+    assert result is None
+    assert "ffmpeg introuvable" in caplog.text

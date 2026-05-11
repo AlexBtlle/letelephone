@@ -18,5 +18,8 @@
     "enabled": false,
     "pin": 27,
     "hold_duration_sec": 3.0
+  },
+  "voice_isolation": {
+    "enabled": true
   }
 }

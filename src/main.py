@@ -9,7 +9,7 @@ from src.audio import AudioController
 from src.config import ConfigError, load as load_config
 from src.display import build as build_display
 from src.hook import HookSwitch
-from src.processing import compress_to_mp3, normalize_audio
+from src.processing import compress_to_mp3, isolate_voice, normalize_audio
 from src.shutdown_button import build as build_shutdown_button
 from src.storage import build_recording_path, count_recordings, ensure_recordings_dir
 from src.usb import UsbStorage
@@ -92,6 +92,7 @@ def main() -> None:
     pre_beep_delay = cfg["pre_beep_delay_sec"]
     min_duration = cfg.get("min_duration_sec", 1.0)
     do_normalize = cfg.get("normalize_audio", True)
+    do_isolate = cfg.get("voice_isolation", {}).get("enabled", True)
     mp3_cfg = cfg.get("compress_mp3", {})
     do_compress = mp3_cfg.get("enabled", True)
     mp3_quality = mp3_cfg.get("quality", 0)
@@ -161,8 +162,11 @@ def main() -> None:
                     )
                     if do_normalize:
                         normalize_audio(output_file)
+                    vocal_file = isolate_voice(output_file) if do_isolate else None
                     if do_compress:
                         compress_to_mp3(output_file, quality=mp3_quality)
+                        if vocal_file and vocal_file.exists():
+                            compress_to_mp3(vocal_file, quality=mp3_quality)
                 else:
                     log.warning("Fichier enregistré vide ou absent : %s", output_file.name)
 
