@@ -68,6 +68,11 @@ def main() -> None:
         log.error("Impossible d'accéder au dossier USB (%s) — fallback local", exc)
         recordings_dir = ensure_recordings_dir(_BASE_DIR)
 
+    raw_dir = recordings_dir / "brut"
+    vocal_dir = recordings_dir / "vocal"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    vocal_dir.mkdir(parents=True, exist_ok=True)
+
     log.info("Démarrage. Enregistrements → %s", recordings_dir)
     if not usb.is_available():
         log.warning("Clé USB non détectée — enregistrements en local.")
@@ -97,7 +102,7 @@ def main() -> None:
     do_compress = mp3_cfg.get("enabled", True)
     mp3_quality = mp3_cfg.get("quality", 0)
 
-    message_count = count_recordings(recordings_dir)
+    message_count = count_recordings(raw_dir)
     log.info("Système prêt (%d message(s) existant(s)).", message_count)
     display.show_idle(couple_name, message_count)
 
@@ -124,7 +129,7 @@ def main() -> None:
                     _wait_for_hangup(hook, poll)
                     continue
 
-                output_file = build_recording_path(recordings_dir)
+                output_file = build_recording_path(raw_dir)
                 record_start = time.monotonic()
                 try:
                     audio.start_recording(output_file)
@@ -162,7 +167,7 @@ def main() -> None:
                     )
                     if do_normalize:
                         normalize_audio(output_file)
-                    vocal_file = isolate_voice(output_file) if do_isolate else None
+                    vocal_file = isolate_voice(output_file, out_path=vocal_dir / output_file.name) if do_isolate else None
                     if do_compress:
                         compress_to_mp3(output_file, quality=mp3_quality)
                         if vocal_file and vocal_file.exists():

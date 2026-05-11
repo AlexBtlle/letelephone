@@ -74,16 +74,16 @@ def compress_to_mp3(wav_path: Path, quality: int = 0) -> Path | None:
         return None
 
 
-def isolate_voice(wav_path: Path) -> Path | None:
-    """Apply FFmpeg voice-frequency filters and save result as <stem>_vocal.wav.
+def isolate_voice(wav_path: Path, out_path: Path | None = None) -> Path | None:
+    """Apply FFmpeg voice-frequency filters and save result to out_path.
 
-    Keeps the original wav_path untouched.
-    Returns the vocal Path on success, None on failure.
+    If out_path is None, saves as <stem>_vocal.wav next to the source.
+    Keeps wav_path untouched. Returns the output Path on success, None on failure.
     """
     if not wav_path.exists():
         log.warning("isolate_voice: fichier introuvable %s", wav_path)
         return None
-    vocal_path = wav_path.with_stem(wav_path.stem + "_vocal")
+    vocal_path = out_path if out_path is not None else wav_path.with_stem(wav_path.stem + "_vocal")
     try:
         subprocess.run(
             [

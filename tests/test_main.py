@@ -75,6 +75,7 @@ def _run_main(env):
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
          patch("src.main.normalize_audio"), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.compress_to_mp3"), \
          patch("src.main.time.sleep", return_value=None):
         main_module.main()
@@ -178,6 +179,7 @@ def test_main_happy_path_records_message(env, tmp_path):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.normalize_audio"):
         main_module.main()
 
@@ -318,6 +320,7 @@ def test_main_display_updated_on_recording(env):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.normalize_audio"):
         main_module.main()
 
@@ -344,6 +347,7 @@ def test_main_message_counter_increments(env):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.normalize_audio"):
         main_module.main()
 
@@ -368,6 +372,7 @@ def test_main_normalize_called_after_recording(env):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.normalize_audio") as mock_normalize:
         main_module.main()
 
@@ -398,14 +403,15 @@ def test_main_normalize_skipped_when_disabled(env):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.normalize_audio") as mock_normalize:
         main_module.main()
 
     mock_normalize.assert_not_called()
 
 
-def test_main_compress_called_after_normalize(env):
-    """compress_to_mp3 must be called once after a valid recording."""
+def test_main_compress_called_after_recording(env):
+    """compress_to_mp3 must be called once on the raw file after a valid recording."""
     wav = env["recordings"] / "message_ok.wav"
     wav.write_bytes(b"\x00" * 100)
 
@@ -421,6 +427,7 @@ def test_main_compress_called_after_normalize(env):
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
          patch("src.main.normalize_audio"), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.compress_to_mp3") as mock_compress:
         main_module.main()
 
@@ -451,7 +458,37 @@ def test_main_compress_skipped_when_disabled(env):
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
          patch("src.main.normalize_audio"), \
+         patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.compress_to_mp3") as mock_compress:
         main_module.main()
 
     mock_compress.assert_not_called()
+
+
+def test_main_isolate_voice_compressed_when_present(env):
+    """When isolate_voice succeeds, the vocal file is also compressed."""
+    wav = env["recordings"] / "message_ok.wav"
+    wav.write_bytes(b"\x00" * 100)
+    vocal_wav = env["recordings"] / "vocal" / "message_ok.wav"
+    vocal_wav.parent.mkdir(parents=True, exist_ok=True)
+    vocal_wav.write_bytes(b"\x00" * 80)
+
+    env["audio"].is_recording.side_effect = [False]
+    env["hook"].is_off_hook.side_effect = [True, False, KeyboardInterrupt]
+
+    with patch("src.main.build_recording_path", return_value=wav), \
+         patch("src.main.time.monotonic", side_effect=[0.0, 5.0]), \
+         patch("src.main.time.sleep", return_value=None), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.normalize_audio"), \
+         patch("src.main.isolate_voice", return_value=vocal_wav), \
+         patch("src.main.compress_to_mp3") as mock_compress:
+        main_module.main()
+
+    assert mock_compress.call_count == 2
+    mock_compress.assert_any_call(wav, quality=0)
+    mock_compress.assert_any_call(vocal_wav, quality=0)

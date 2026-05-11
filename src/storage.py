@@ -18,7 +18,5 @@ def count_recordings(recordings_dir: Path) -> int:
         return 0
     return sum(
         1 for f in recordings_dir.iterdir()
-        if f.stem.startswith("message_")
-        and not f.stem.endswith("_vocal")
-        and f.suffix in (".wav", ".mp3")
+        if f.stem.startswith("message_") and f.suffix in (".wav", ".mp3")
     )

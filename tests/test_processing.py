@@ -153,26 +153,45 @@ def test_compress_to_mp3_uses_quality_param(tmp_path):
 # ── isolate_voice ─────────────────────────────────────────────────────────────
 
 def test_isolate_voice_creates_vocal_file(tmp_path):
-    wav = tmp_path / "message_2026-01-01_12-00-00.wav"
+    wav = tmp_path / "brut" / "message_2026-01-01_12-00-00.wav"
+    wav.parent.mkdir()
     wav.write_bytes(b"\x00" * 100)
-    vocal = tmp_path / "message_2026-01-01_12-00-00_vocal.wav"
+    vocal = tmp_path / "vocal" / "message_2026-01-01_12-00-00.wav"
+    vocal.parent.mkdir()
 
     def fake_run(*args, **kwargs):
         vocal.write_bytes(b"\x00" * 80)
         return MagicMock(returncode=0)
 
     with patch("src.processing.subprocess.run", side_effect=fake_run):
-        result = isolate_voice(wav)
+        result = isolate_voice(wav, out_path=vocal)
 
     assert result == vocal
     assert vocal.exists()
     assert wav.exists()  # original untouched
 
 
+def test_isolate_voice_default_out_path(tmp_path):
+    """Without out_path, falls back to <stem>_vocal.wav next to source."""
+    wav = tmp_path / "message_2026-01-01_12-00-00.wav"
+    wav.write_bytes(b"\x00" * 100)
+    expected = tmp_path / "message_2026-01-01_12-00-00_vocal.wav"
+
+    def fake_run(*args, **kwargs):
+        expected.write_bytes(b"\x00" * 80)
+        return MagicMock(returncode=0)
+
+    with patch("src.processing.subprocess.run", side_effect=fake_run):
+        result = isolate_voice(wav)
+
+    assert result == expected
+
+
 def test_isolate_voice_uses_voice_filters(tmp_path):
     wav = tmp_path / "test.wav"
     wav.write_bytes(b"\x00" * 100)
-    vocal = tmp_path / "test_vocal.wav"
+    vocal = tmp_path / "vocal" / "test.wav"
+    vocal.parent.mkdir()
     captured = {}
 
     def fake_run(cmd, **kwargs):
@@ -181,7 +200,7 @@ def test_isolate_voice_uses_voice_filters(tmp_path):
         return MagicMock(returncode=0)
 
     with patch("src.processing.subprocess.run", side_effect=fake_run):
-        isolate_voice(wav)
+        isolate_voice(wav, out_path=vocal)
 
     assert "-af" in captured["cmd"]
     af_value = captured["cmd"][captured["cmd"].index("-af") + 1]
@@ -210,11 +229,12 @@ def test_isolate_voice_ffmpeg_failure(tmp_path, caplog):
 def test_isolate_voice_cleans_partial_file_on_failure(tmp_path):
     wav = tmp_path / "test.wav"
     wav.write_bytes(b"\x00" * 100)
-    vocal = tmp_path / "test_vocal.wav"
+    vocal = tmp_path / "vocal" / "test.wav"
+    vocal.parent.mkdir()
     vocal.write_bytes(b"\x00" * 20)
     exc = subprocess.CalledProcessError(1, "ffmpeg", stderr=b"")
     with patch("src.processing.subprocess.run", side_effect=exc):
-        isolate_voice(wav)
+        isolate_voice(wav, out_path=vocal)
     assert not vocal.exists()
 
 
