@@ -32,6 +32,7 @@ except ImportError:
 class _DisplayProtocol(Protocol):
     def show_idle(self, couple_name: str, message_count: int) -> None: ...
     def show_recording(self, couple_name: str, message_count: int) -> None: ...
+    def show_playback(self, couple_name: str, message_count: int) -> None: ...
     def clear(self) -> None: ...
 
 
@@ -39,6 +40,7 @@ class _NoOpDisplay:
     """Used when luma.oled is unavailable or the display is not found."""
     def show_idle(self, couple_name: str, message_count: int) -> None: pass
     def show_recording(self, couple_name: str, message_count: int) -> None: pass
+    def show_playback(self, couple_name: str, message_count: int) -> None: pass
     def clear(self) -> None: pass
 
 
@@ -55,6 +57,9 @@ class OledDisplay:
 
     def show_recording(self, couple_name: str, message_count: int) -> None:
         self._draw(couple_name, "* ENREGISTREMENT", message_count)
+
+    def show_playback(self, couple_name: str, message_count: int) -> None:
+        self._draw(couple_name, "> LECTURE", message_count)
 
     def clear(self) -> None:
         self._device.clear()

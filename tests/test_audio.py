@@ -102,6 +102,67 @@ def test_play_audio_propagates_file_not_found_for_aplay(audio, tmp_path):
             audio.play_audio(wav)
 
 
+# ── Non-blocking playback ─────────────────────────────────────────────────────
+
+def test_start_playback_missing_file(audio, tmp_path):
+    with pytest.raises(FileNotFoundError):
+        audio.start_playback(tmp_path / "nonexistent.wav")
+
+
+def test_start_playback_launches_aplay(audio, tmp_path):
+    wav = tmp_path / "msg.wav"
+    wav.write_bytes(b"\x00" * 44)
+    with patch("subprocess.Popen") as mock_popen:
+        mock_popen.return_value = MagicMock()
+        audio.start_playback(wav)
+        args = mock_popen.call_args[0][0]
+        assert "aplay" in args
+        assert str(wav) in args
+
+
+def test_stop_playback_terminates_process(audio):
+    mock_proc = MagicMock()
+    mock_proc.poll.return_value = None
+    mock_proc.wait.return_value = 0
+    audio._playback_process = mock_proc
+    audio.stop_playback()
+    mock_proc.terminate.assert_called_once()
+    assert audio._playback_process is None
+
+
+def test_stop_playback_noop_when_idle(audio):
+    audio._playback_process = None
+    audio.stop_playback()  # must not raise
+
+
+def test_stop_playback_noop_if_process_already_finished(audio):
+    mock_proc = MagicMock()
+    mock_proc.poll.return_value = 0
+    audio._playback_process = mock_proc
+    audio.stop_playback()
+    mock_proc.terminate.assert_not_called()
+    assert audio._playback_process is None
+
+
+def test_is_playing_true_when_active(audio):
+    mock_proc = MagicMock()
+    mock_proc.poll.return_value = None
+    audio._playback_process = mock_proc
+    assert audio.is_playing() is True
+
+
+def test_is_playing_false_when_finished(audio):
+    mock_proc = MagicMock()
+    mock_proc.poll.return_value = 0
+    audio._playback_process = mock_proc
+    assert audio.is_playing() is False
+
+
+def test_is_playing_false_when_no_process(audio):
+    audio._playback_process = None
+    assert audio.is_playing() is False
+
+
 # ── Recording ────────────────────────────────────────────────────────────────
 
 def test_start_recording_launches_arecord(audio, tmp_path):

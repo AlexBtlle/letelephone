@@ -9,6 +9,7 @@ from src.audio import AudioController
 from src.config import ConfigError, load as load_config
 from src.display import build as build_display
 from src.hook import HookSwitch
+from src.playback_button import build as build_playback_button
 from src.processing import compress_to_mp3, isolate_voice, normalize_audio
 from src.shutdown_button import build as build_shutdown_button
 from src.storage import build_recording_path, count_recordings, ensure_recordings_dir
@@ -30,6 +31,7 @@ _DEFAULTS = {
     "normalize_audio": True,
     "compress_mp3": {"enabled": True, "quality": 0},
     "shutdown_button": {"enabled": False},
+    "playback_button": {"enabled": False},
 }
 
 
@@ -93,6 +95,15 @@ def main() -> None:
     display = build_display()
     shutdown_btn = build_shutdown_button(cfg, on_shutdown=lambda: log.info("Arrêt demandé via bouton."))
 
+    playback_requested = False
+
+    def _on_playback_press() -> None:
+        nonlocal playback_requested
+        playback_requested = True
+        log.info("Lecture demandée — décrochez pour écouter.")
+
+    playback_btn = build_playback_button(cfg, on_press=_on_playback_press)
+
     poll = cfg["poll_interval_sec"]
     pre_beep_delay = cfg["pre_beep_delay_sec"]
     min_duration = cfg.get("min_duration_sec", 1.0)
@@ -116,6 +127,14 @@ def main() -> None:
                 continue
 
             if off_hook:
+                if playback_requested:
+                    playback_requested = False
+                    display.show_playback(couple_name, message_count)
+                    _run_playback(audio, raw_dir, hook, poll)
+                    display.show_idle(couple_name, message_count)
+                    log.info("Retour en attente.")
+                    continue
+
                 log.info("Décroché détecté.")
                 display.show_recording(couple_name, message_count)
                 time.sleep(pre_beep_delay)
@@ -185,9 +204,46 @@ def main() -> None:
         log.info("Arrêt demandé.")
     finally:
         audio.stop_recording()
+        audio.stop_playback()
         hook.close()
         display.clear()
         shutdown_btn.close()
+        playback_btn.close()
+
+
+def _run_playback(
+    audio: AudioController,
+    raw_dir: Path,
+    hook: HookSwitch,
+    poll: float,
+) -> None:
+    log_pb = logging.getLogger(__name__)
+    files = sorted(
+        [
+            f for f in raw_dir.iterdir()
+            if f.stem.startswith("message_") and f.suffix in (".wav", ".mp3")
+        ],
+        reverse=True,  # newest first
+    )
+    if not files:
+        log_pb.info("Mode lecture : aucun message.")
+        _wait_for_hangup(hook, poll)
+        return
+    log_pb.info("Mode lecture : %d message(s).", len(files))
+    for i, f in enumerate(files):
+        if not hook.is_off_hook():
+            break
+        log_pb.info("Lecture %d/%d : %s", i + 1, len(files), f.name)
+        try:
+            audio.start_playback(f)
+        except Exception as exc:
+            log_pb.error("Erreur lecture %s : %s", f.name, exc)
+            continue
+        while audio.is_playing() and hook.is_off_hook():
+            time.sleep(poll)
+        audio.stop_playback()
+    _wait_for_hangup(hook, poll)
+    log_pb.info("Fin du mode lecture.")
 
 
 def _wait_for_hangup(hook: HookSwitch, poll: float) -> None:

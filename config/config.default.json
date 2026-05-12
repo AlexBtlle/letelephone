@@ -21,5 +21,9 @@
   },
   "voice_isolation": {
     "enabled": true
+  },
+  "playback_button": {
+    "enabled": false,
+    "pin": 25
   }
 }

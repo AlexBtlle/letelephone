@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 import src.main as main_module
-from src.main import _try_play_error, _wait_for_hangup
+from src.main import _run_playback, _try_play_error, _wait_for_hangup
 
 
 # ── Fixture: full main() environment ─────────────────────────────────────────
@@ -74,6 +74,7 @@ def _run_main(env):
          patch("src.main.HookSwitch", return_value=env["hook"]), \
          patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
          patch("src.main.build_shutdown_button", return_value=MagicMock()), \
+         patch("src.main.build_playback_button", return_value=MagicMock()), \
          patch("src.main.normalize_audio"), \
          patch("src.main.isolate_voice", return_value=None), \
          patch("src.main.compress_to_mp3"), \
@@ -492,3 +493,123 @@ def test_main_isolate_voice_compressed_when_present(env):
     assert mock_compress.call_count == 2
     mock_compress.assert_any_call(wav, quality=0)
     mock_compress.assert_any_call(vocal_wav, quality=0)
+
+
+# ── _run_playback ─────────────────────────────────────────────────────────────
+
+def test_run_playback_plays_messages_newest_first(tmp_path):
+    raw_dir = tmp_path / "brut"
+    raw_dir.mkdir()
+    f1 = raw_dir / "message_2026-01-01_10-00-00.mp3"
+    f2 = raw_dir / "message_2026-01-01_11-00-00.mp3"
+    f1.write_bytes(b"\x00")
+    f2.write_bytes(b"\x00")
+
+    audio = MagicMock()
+    audio.is_playing.side_effect = [True, False, True, False]
+    hook = MagicMock()
+    # True: before f2 / True: inner loop f2 / True: before f1 / True: inner loop f1 / False: hangup
+    hook.is_off_hook.side_effect = [True, True, True, True, False]
+    display = MagicMock()
+
+    with patch("src.main.time.sleep"):
+        _run_playback(audio, raw_dir, hook, poll=0)
+
+    assert audio.start_playback.call_count == 2
+    assert audio.start_playback.call_args_list[0].args[0] == f2
+    assert audio.start_playback.call_args_list[1].args[0] == f1
+    assert audio.stop_playback.call_count == 2
+
+
+def test_run_playback_no_messages_waits_for_hangup(tmp_path):
+    raw_dir = tmp_path / "brut"
+    raw_dir.mkdir()
+    audio = MagicMock()
+    hook = MagicMock()
+    hook.is_off_hook.return_value = False
+    display = MagicMock()
+
+    with patch("src.main.time.sleep"):
+        _run_playback(audio, raw_dir, hook, poll=0)
+
+    audio.start_playback.assert_not_called()
+
+
+def test_run_playback_stops_on_hangup(tmp_path):
+    raw_dir = tmp_path / "brut"
+    raw_dir.mkdir()
+    f1 = raw_dir / "message_2026-01-01_10-00-00.mp3"
+    f1.write_bytes(b"\x00")
+
+    audio = MagicMock()
+    audio.is_playing.return_value = True
+    hook = MagicMock()
+    # True: before f1 / False: during inner loop → exits / False: hangup
+    hook.is_off_hook.side_effect = [True, False, False]
+
+    with patch("src.main.time.sleep"):
+        _run_playback(audio, raw_dir, hook, poll=0)
+
+    audio.start_playback.assert_called_once_with(f1)
+    audio.stop_playback.assert_called_once()
+
+
+def test_run_playback_skips_file_on_error(tmp_path):
+    raw_dir = tmp_path / "brut"
+    raw_dir.mkdir()
+    f1 = raw_dir / "message_2026-01-01_10-00-00.mp3"
+    f2 = raw_dir / "message_2026-01-01_11-00-00.mp3"
+    f1.write_bytes(b"\x00")
+    f2.write_bytes(b"\x00")
+
+    audio = MagicMock()
+    audio.start_playback.side_effect = [FileNotFoundError("aplay missing"), None]
+    audio.is_playing.side_effect = [True, False]
+    hook = MagicMock()
+    hook.is_off_hook.side_effect = [True, True, True, False]
+
+    with patch("src.main.time.sleep"):
+        _run_playback(audio, raw_dir, hook, poll=0)
+
+    assert audio.start_playback.call_count == 2
+
+
+# ── main() playback mode ──────────────────────────────────────────────────────
+
+def test_main_playback_mode_triggered_by_button(env):
+    """Button press sets playback_requested; next off-hook triggers playback not recording."""
+    captured = {}
+
+    def fake_build_playback(cfg, on_press=None):
+        captured["on_press"] = on_press
+        return MagicMock()
+
+    slept = [0]
+
+    def fake_sleep(_):
+        slept[0] += 1
+        if slept[0] == 1 and "on_press" in captured:
+            captured["on_press"]()  # simulate button press during idle
+
+    env["hook"].is_off_hook.side_effect = [
+        False,          # idle: not off-hook → sleep → callback fires
+        True,           # playback_requested + off-hook → playback mode
+        False,          # _wait_for_hangup inside _run_playback (no messages)
+        KeyboardInterrupt,
+    ]
+    mock_display = MagicMock()
+    (env["recordings"] / "brut").mkdir(parents=True, exist_ok=True)
+
+    with patch("src.main.build_display", return_value=mock_display), \
+         patch("src.main.build_playback_button", side_effect=fake_build_playback), \
+         patch("src.main.time.sleep", side_effect=fake_sleep), \
+         patch("src.main.UsbStorage", return_value=env["usb"]), \
+         patch("src.main.AudioController", return_value=env["audio"]), \
+         patch("src.main.HookSwitch", return_value=env["hook"]), \
+         patch("src.main.ensure_recordings_dir", return_value=env["recordings"]), \
+         patch("src.main.build_shutdown_button", return_value=MagicMock()):
+        main_module.main()
+
+    mock_display.show_playback.assert_called_once()
+    mock_display.show_idle.assert_called()
+    env["audio"].start_recording.assert_not_called()

@@ -41,6 +41,7 @@ class AudioController:
         self.playback_device = playback_device or _detect_usb_alsa_device("playback")
         self.capture_device = capture_device or _detect_usb_alsa_device("capture")
         self._recording_process: subprocess.Popen | None = None
+        self._playback_process: subprocess.Popen | None = None
         log.info(
             "AudioController: playback=%s capture=%s",
             self.playback_device, self.capture_device,
@@ -55,6 +56,32 @@ class AudioController:
             check=True,
             timeout=self.max_duration_sec + 10,
         )
+
+    def start_playback(self, audio_file: Path) -> None:
+        """Start non-blocking playback via aplay. Use stop_playback() to interrupt."""
+        if not audio_file.exists():
+            raise FileNotFoundError(f"Fichier audio introuvable : {audio_file}")
+        log.debug("Lecture (non-bloquante) : %s", audio_file.name)
+        self._playback_process = subprocess.Popen(
+            ["aplay", "-D", self.playback_device, str(audio_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def stop_playback(self) -> None:
+        if self._playback_process is None:
+            return
+        if self._playback_process.poll() is None:
+            self._playback_process.terminate()
+            try:
+                self._playback_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._playback_process.kill()
+                self._playback_process.wait(timeout=3)
+        self._playback_process = None
+
+    def is_playing(self) -> bool:
+        return self._playback_process is not None and self._playback_process.poll() is None
 
     def start_recording(self, output_file: Path) -> None:
         if self._recording_process is not None and self._recording_process.poll() is None:
