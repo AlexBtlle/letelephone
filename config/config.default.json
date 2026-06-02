@@ -1,0 +1,29 @@
+{
+  "hook_pin": 17,
+  "poll_interval_sec": 0.05,
+  "pre_beep_delay_sec": 2.0,
+  "max_duration_sec": 180,
+  "min_duration_sec": 1.0,
+  "couple_name": "",
+  "audio": {
+    "sample_rate": 44100,
+    "channels": 1
+  },
+  "normalize_audio": true,
+  "compress_mp3": {
+    "enabled": true,
+    "quality": 0
+  },
+  "shutdown_button": {
+    "enabled": false,
+    "pin": 27,
+    "hold_duration_sec": 3.0
+  },
+  "voice_isolation": {
+    "enabled": true
+  },
+  "playback_button": {
+    "enabled": false,
+    "pin": 25
+  }
+}

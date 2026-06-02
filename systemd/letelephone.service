@@ -1,0 +1,18 @@
+[Unit]
+Description=Livre d'Or Audio
+After=multi-user.target sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/letelephone
+ExecStartPre=/usr/bin/python3 -m src.selftest
+ExecStart=/usr/bin/python3 -m src.main
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

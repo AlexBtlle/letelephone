@@ -1,1 +1,4 @@
 gpiozero
+luma.oled
+pytest
+pytest-cov

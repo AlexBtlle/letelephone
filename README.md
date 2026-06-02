@@ -1,64 +1,102 @@
-# Livre d’Or Audio
+# Le Téléphone — Livre d'or audio pour mariages
 
-**En cours de développement - Je ne garantie pas le bon fonctionnement**
+Un vieux téléphone vintage branché à un Raspberry Pi. Les invités décrochent, entendent un mot du couple, et laissent leur message vocal. Les enregistrements sont sauvegardés automatiquement sur une clé USB.
 
-Un **système interactif de livre d’or audio** basé sur Raspberry Pi permettant de recueillir des messages vocaux lors d’un événement (par exemple, un mariage). Les invités décrochent un combiné de téléphone ancien, entendent une annonce d’accueil (ou juste un bip), puis enregistrent leur message qui est stocké sur le Raspberry Pi.
+---
+
+## Comment ça marche
+
+```
+  L'invité décroche          Le message d'accueil       L'invité parle
+  ───────────────            ──────────────────         ─────────────
+       ↓                     du couple se joue              ↓
+  L'écran passe en                    ↓              L'invité raccroche
+  mode ENREGISTREMENT          C'est parti !                 ↓
+                                                  Le fichier est sauvegardé
+                                                  sur la clé USB
+```
+
+L'écran OLED (optionnel) affiche en permanence :
+
+```
+┌────────────────────────┐
+│ Alice & Bob            │  ← nom du couple
+│                        │
+│ EN ATTENTE             │  ← statut en temps réel
+│                        │
+│ Messages : 7           │  ← nombre de messages enregistrés
+└────────────────────────┘
+```
+
+---
+
+## Deux configurations possibles
+
+| | Configuration standard | Configuration compacte |
+|---|---|---|
+| **Carte** | Pi 3B+, Pi 4 ou Pi 5 | Pi Zero 2 WH |
+| **Audio** | Dongle USB (~8€) | IQaudio Codec Zero HAT (~18€) |
+| **Prix total** | ~80–100 € | ~60 € |
+| **Encombrement** | Normal | Très petit |
+| **Montage** | Simple | Simple (HAT emboîté) |
+
+> Le Pi Zero 2 W avec Codec Zero est l'option la plus économique. Le script d'installation configure tout automatiquement.
+
+Voir le [guide matériel complet](docs/materiel.md) pour la liste précise des composants et les liens d'achat.
+
+---
+
+## Documentation
+
+| Guide | Pour qui | Contenu |
+|---|---|---|
+| [Matériel](docs/materiel.md) | Avant d'acheter | Listes de composants, prix, où acheter, conseils |
+| [Câblage](docs/cablage.md) | Au moment de monter | Schémas fil à fil, photos de référence |
+| [Installation](docs/installation.md) | Une seule fois | Mise en place du logiciel, étape par étape |
+| [Utilisation](docs/utilisation.md) | Avant chaque événement | Préparer la clé USB, dépannage, récupérer les messages |
+
+---
+
+## Installation en 4 commandes
+
+```bash
+git clone https://github.com/AlexBtlle/letelephone.git
+cd letelephone
+sudo bash install.sh
+sudo systemctl start letelephone
+```
+
+> Sur Pi Zero 2 W avec Codec Zero, le script détecte automatiquement la carte et configure le pilote audio. Un redémarrage est demandé si nécessaire.
 
 ---
 
 ## Fonctionnalités
 
-- **Détection du combiné** : Hook switch (GPIO) détecte le décrochage et le raccrochage.
-- **Annonce sonore** : Lecture automatique d’un fichier WAV beep.wav.
-- **Enregistrement audio** : Démarrage automatique de l’enregistrement après l’annonce, fin lors du raccrochage.
-- **Durée maximale** : TODO
-- **TODO Démarrage autonome** : TODO
-
-> **Évolutions envisagées** : Enregistrement sur une clé USB. Paramètrage via un fichier stocké sur la clé.
-
----
-
-## Architecture du projet
-
-```
-
-```
+- **Décrochage automatique** — détection du hook switch via GPIO, sans délai
+- **Message d'accueil personnalisé** — fichier `welcome.wav` sur la clé USB (bip par défaut)
+- **Normalisation audio** — tous les messages au même volume, sans intervention manuelle
+- **Compression MP3** — les messages sont convertis en MP3 haute qualité, 5× plus légers que le WAV
+- **Écran OLED** — affichage du statut et du compteur en temps réel (optionnel)
+- **Bouton d'arrêt** — appui 3 secondes pour éteindre proprement le Pi (optionnel)
+- **Sauvegarde USB automatique** — fallback local si la clé est absente
+- **Auto-test au démarrage** — détecte les problèmes avant l'événement
+- **Compatible Pi 3B+, Pi 4, Pi 5, Pi Zero 2 W** — un seul logiciel pour toutes les cartes
 
 ---
 
-## Branchements
+## Clé USB — workflow rapide
 
-### 1. Hook switch (combiné Socotel)
-- **GPIO BCM 17** (pin 11) connecté à une borne de l’interrupteur hook.
-- L’autre borne de l’interrupteur reliée au GND.
+Deux fichiers à placer à la racine de la clé avant l'événement :
 
-### 2. Circuit audio (dongle USB)
-- **Sortie casque** (Headphone Out) du dongle USB → fil **speaker** du combiné.
-- **Entrée micro** (Mic In) du dongle USB → fil **microphone** du combiné.
-- **Masse** du dongle USB → fil **masse** du combiné.
+| Fichier | Rôle |
+|---|---|
+| `welcome.wav` | Message d'accueil enregistré par le couple |
+| `couple.txt` | Nom affiché sur l'écran (`Alice & Bob`) |
 
-### 4. Alimentation
-- **Raspberry Pi 4** alimenté en 5 V (Je recommande l'utilisation de l'alimentation officielle).
-
----
-
-## Installation & Déploiement
-
-1. Créer le dépôt sur GitHub, cloner et ouvrir localement.
-
----
-
-## Utilisation
-
-
----
-
-## Contribuer
+Les messages sont sauvegardés automatiquement dans `enregistrements/` sur la clé, au format MP3.
 
 ---
 
 ## Licence
 
-Licence **GNU GPL v3**. Voir `LICENSE` pour plus de détails.
-
-> **Note**: Certaines parties du contenu de ce projet (code, documentation, README) ont été générées par ChatGPT.
+GNU GPL v3 — voir `LICENSE`.

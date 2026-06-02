@@ -1,0 +1,121 @@
+import subprocess
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from src.usb import UsbStorage, _find_mount_point
+
+
+def test_is_available_false_when_no_usb(monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
+    usb = UsbStorage()
+    assert usb.is_available() is False
+
+
+def test_is_available_true_when_mounted(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.is_available() is True
+
+
+def test_recordings_dir_created(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        d = usb.recordings_dir()
+        assert d == tmp_path / "enregistrements"
+        assert d.exists()
+
+
+def test_log_dir_created(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        d = usb.log_dir()
+        assert d == tmp_path / "logs"
+        assert d.exists()
+
+
+def test_welcome_file_found(tmp_path, monkeypatch):
+    (tmp_path / "welcome.wav").write_bytes(b"\x00")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.welcome_file() == tmp_path / "welcome.wav"
+
+
+def test_welcome_file_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.welcome_file() is None
+
+
+def test_welcome_file_no_usb(monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
+    usb = UsbStorage()
+    assert usb.welcome_file() is None
+
+
+def test_find_mount_point_returns_none_if_no_media(monkeypatch, tmp_path):
+    monkeypatch.setattr("src.usb._MEDIA_BASE", str(tmp_path / "nonexistent"))
+    assert _find_mount_point() is None
+
+
+def test_find_mount_point_returns_none_if_nothing_mounted(monkeypatch, tmp_path):
+    import getpass
+    fake_base = tmp_path / getpass.getuser()
+    fake_base.mkdir(parents=True)
+    (fake_base / "MYKEY").mkdir()
+    monkeypatch.setattr("src.usb._MEDIA_BASE", str(tmp_path))
+    assert _find_mount_point() is None
+
+
+# ── couple_name() ─────────────────────────────────────────────────────────────
+
+def test_couple_name_read_from_file(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_text("Alice & Bob\n", encoding="utf-8")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Alice & Bob"
+
+
+def test_couple_name_stripped(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_text("  Marie & Paul  \n", encoding="utf-8")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Marie & Paul"
+
+
+def test_couple_name_absent_returns_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == ""
+
+
+def test_couple_name_no_usb_returns_empty(monkeypatch):
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: None)
+    usb = UsbStorage()
+    assert usb.couple_name() == ""
+
+
+def test_couple_name_strips_bom(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_bytes(b"\xef\xbb\xbfAlice & Bob\n")  # UTF-8 BOM (Windows Notepad)
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True):
+        usb = UsbStorage()
+        assert usb.couple_name() == "Alice & Bob"
+
+
+def test_couple_name_os_error_returns_empty(tmp_path, monkeypatch):
+    (tmp_path / "couple.txt").write_bytes(b"\x00")
+    monkeypatch.setattr("src.usb._find_mount_point", lambda: tmp_path)
+    with patch.object(Path, "is_mount", return_value=True), \
+         patch.object(Path, "read_text", side_effect=OSError("permission denied")):
+        usb = UsbStorage()
+        assert usb.couple_name() == ""
